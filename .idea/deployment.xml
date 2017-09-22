@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData">
+    <serverData>
+      <paths name="bo718.wang">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping local="" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="rui.wu">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/GZHermit/Workspace/GAN4Seg/" local="$PROJECT_DIR$" web="/" />
+            <mapping local="" web="" />
+            <mapping deploy="/GZHermit/Workspace/SegModels/" local="$PROJECT_DIR$/../SegModels" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

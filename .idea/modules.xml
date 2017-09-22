@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/GAN4Seg.iml" filepath="$PROJECT_DIR$/.idea/GAN4Seg.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../HumanPose/.idea/HumanPose.iml" filepath="$PROJECT_DIR$/../HumanPose/.idea/HumanPose.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../ImageTest/.idea/ImageTest.iml" filepath="$PROJECT_DIR$/../ImageTest/.idea/ImageTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../SegModels/.idea/SegModels.iml" filepath="$PROJECT_DIR$/../SegModels/.idea/SegModels.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../hourglasstensorlfow-master/.idea/hourglasstensorlfow-master.iml" filepath="$PROJECT_DIR$/../hourglasstensorlfow-master/.idea/hourglasstensorlfow-master.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../tensorflow-deeplab-resnet-master/.idea/tensorflow-deeplab-resnet-master.iml" filepath="$PROJECT_DIR$/../tensorflow-deeplab-resnet-master/.idea/tensorflow-deeplab-resnet-master.iml" />
+    </modules>
+  </component>
+</project>
