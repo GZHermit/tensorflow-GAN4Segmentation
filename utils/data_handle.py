@@ -8,21 +8,16 @@ import numpy as np
 
 def load_weight(weight_path, saver, sess):
     if '.npy' in weight_path:
+        var_list = saver
         data_dict = np.load(weight_path, encoding='latin1').item()
         for op_name in data_dict:
             if 'fc' in op_name: continue
             w, b = data_dict[op_name][0], data_dict[op_name][1]
-            # print('discriminator_add_vgg/image_' + op_name + '/weights')
-            # # tf.global_variables()
-            # d_var = [v for v in tf.trainable_variables() if 'discriminator' in v.name]
-            # for item in d_var:
-            #     print(item.op.name)
-            w_var = [v for v in saver if op_name in v.op.name and 'weights' in v.op.name][0]
-            b_var = [v for v in saver if op_name in v.op.name and 'biases' in v.op.name][0]
+            w_var = [v for v in var_list if op_name in v.op.name and 'weights' in v.op.name][0]
+            b_var = [v for v in var_list if op_name in v.op.name and 'biases' in v.op.name][0]
             sess.run(w_var.assign(w))
             sess.run(b_var.assign(b))
-            # except ValueError:
-            #     print("fail to load %s layer in vgg16.npy!" % op_name)
+        return
     else:
         try:
             cp_path = tf.train.latest_checkpoint(weight_path)
