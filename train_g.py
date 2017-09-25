@@ -47,7 +47,7 @@ def train(args):
     tf.set_random_seed(args.random_seed)
     coord = tf.train.Coordinator()
     print("d_model_name:", args.d_name)
-    print("lambda:", args.lamb)
+    print("lambda:", args.lambd)
     print("learning_rate:", args.learning_rate)
     print("is_val:", args.is_val)
     print("---------------------------------")
@@ -136,8 +136,7 @@ def train(args):
     if os.path.exists(args.restore_from + 'checkpoint'):
         trained_step = load_weight(args.restore_from, saver_all, sess)
     else:
-        saver_g = tf.train.Saver(var_list=g_restore_var, max_to_keep=1000)
-    load_weight(args.baseweight_from, saver_g, sess)
+        load_weight(args.baseweight_from, g_restore_var, sess)
 
     threads = tf.train.start_queue_runners(sess, coord)
     print("all setting has been done,training start!")
@@ -145,18 +144,17 @@ def train(args):
     ## start training
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
-    feed_dict = {iterstep: now_step}
-    g_loss_, _, _ = sess.run([g_loss_var, train_all_op, metrics_op],feed_dict)
+        feed_dict = {iterstep: now_step}
+        g_loss_, g_loss1, _, _ = sess.run([g_loss_var, g_loss, train_all_op, metrics_op], feed_dict)
 
-    if step > 0 and step % args.save_pred_every == 0:
-        save_weight(args.restore_from, saver_all, sess, now_step)
+        if step > 0 and step % args.save_pred_every == 0:
+            save_weight(args.restore_from, saver_all, sess, now_step)
 
-    if step % 50 == 0 or step == args.num_steps - 1:
-        print('step={} g_loss={}'.format(now_step,g_loss_))
-
-    summary_str = sess.run(summary_op, feed_dict)
-    summary_writer.add_summary(summary_str, now_step)
-    sess.run(local_init)
+        if step % 50 == 0 or step == args.num_steps - 1:
+            print('step={} g_loss={}'.format(now_step, g_loss_))
+            summary_str = sess.run(summary_op, feed_dict)
+            summary_writer.add_summary(summary_str, now_step)
+            sess.run(local_init)
 
     ## end training
     coord.request_stop()
