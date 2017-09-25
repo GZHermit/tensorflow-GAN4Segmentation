@@ -4,10 +4,9 @@ import os
 import time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '10'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 time.sleep(2)
 
-import train
 import val
 import val_include_d
 import train_g
@@ -15,16 +14,13 @@ import train_d_vgg
 
 
 def start(args):
+
     if args.is_val:
         print("Go into the validation stage")
-        # val.val(args)
         val_include_d.val(args)
     else:
         print("Go into the train stage")
-        # train.train(args)
-        # train_only_g.train(args)
         train_g.train(args)
-        # train_d_vgg.train(args)
 
 
 def get_arguments():
@@ -34,25 +30,24 @@ def get_arguments():
       A list of parsed arguments.
     """
 
-    BATCH_SIZE = 1
-    DATA_DIRECTORY = ['/data/bo718.wang/zhaowei/data/516data/VOC2012trainval/VOC2012/',
-                      '/data/bo718.wang/zhaowei/data/516data/SBD/']
+    BATCH_SIZE = 4
+    DATA_DIRECTORY = ['/media/fanyang/workspace/DataSet/voc+sbd/VOC2012/', ]
     IGNORE_LABEL = 255
-    IMG_SIZE = (504, 504)
-    LEARNING_RATE = 1e-3
+    IMG_SIZE = (513, 513)
+    LEARNING_RATE = 3e-5
     MOMENTUM = 0.9
     NUM_CLASSES = 21
     NUM_STEPS = 50000 + 1
     POWER = 0.9
     RANDOM_SEED = 1234
-    IS_VAL = True
+    IS_VAL = False
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0005
     D_NAME = 'disc_add_vgg'
     LAMBD = 0.1
 
-    parser = argparse.ArgumentParser(description="DeepLab_ResNet GAN")
+    parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE,
                         help="Number of images sent to the network in one step.")
     parser.add_argument("--data_dir", type=list, default=DATA_DIRECTORY,
@@ -77,18 +72,12 @@ def get_arguments():
                         help="Random seed to have reproducible results.")
     parser.add_argument("--d_name", type=str, default=D_NAME,
                         help="which d_model can be choosed")
-    parser.add_argument("--restore_from", type=str, default=RESTORE_FROM,
-                        help="Where restore model parameters from.")
     parser.add_argument("--save_num_images", type=int, default=SAVE_NUM_IMAGES,
                         help="How many images to save.")
     parser.add_argument("--save_pred_every", type=int, default=SAVE_PRED_EVERY,
                         help="Save summaries and checkpoint every often.")
-    parser.add_argument("--log_dir", type=str, default=LOG_DIR,
-                        help="Where to save tensorboard log of the model.")
     parser.add_argument("--weight_decay", type=float, default=WEIGHT_DECAY,
                         help="Regularisation parameter for L2-loss.")
-    parser.add_argument("--baseweight_from", type=str, default=BASEWEIGHT_FROM,
-                        help="Where base model weight from")
     parser.add_argument("--is_val", type=bool, default=IS_VAL,
                         help="Use the Val")
     parser.add_argument("--is_training", action="store_true",
@@ -102,12 +91,21 @@ def get_arguments():
     parser.add_argument("--random_crop", type=bool, default=True,
                         help="Whether to randomly scale the inputs during the training.")
 
-    return parser.parse_args()
+    return parser, parser.parse_args()
 
 
 if __name__ == '__main__':
-    args = get_arguments()
+    parser, args = get_arguments()
 
     RESTORE_FROM = './weights/%s/%f/' % (args.d_name, args.learning_rate)
-    LOG_DIR = './tblogs/val/%s/%f/' % (args.d_name, args.learning_rate) if args.is_val else './tblogs/train/%s/%f/' % (args.d_name, args.learning_rate)
-    BASEWEIGHT_FROM = ''
+    LOG_DIR = './tblogs/val/%s/%f/' % (args.d_name, args.learning_rate) if args.is_val else './tblogs/train/%s/%f/' % (
+        args.d_name, args.learning_rate)
+    BASEWEIGHT_FROM = './weights/init/vgg16.npy'
+    parser.add_argument("--log_dir", type=str, default=LOG_DIR,
+                        help="Where to save tensorboard log of the model.")
+    parser.add_argument("--restore_from", type=str, default=RESTORE_FROM,
+                        help="Where restore model parameters from.")
+    parser.add_argument("--baseweight_from", type=str, default=BASEWEIGHT_FROM,
+                        help="Where base model weight from")
+    args = parser.parse_args()
+    start(args)
