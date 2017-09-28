@@ -85,7 +85,9 @@ def train(args):
     g_net = Generator({'data': image_batch})
     score_map = g_net.get_output()
     fk_batch = tf.nn.softmax(score_map, dim=-1)
+    pre_batch = tf.arg_max(fk_batch,dimension=-1)
     gt_batch = tf.image.resize_nearest_neighbor(label_batch, score_map.get_shape()[1:3])
+    gt_batch = tf.where(tf.equal(gt_batch, args.ignore_label), pre_batch, gt_batch)
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
     x_batch = tf.train.batch([(reader.image + img_mean) / 255., ], args.batch_size)  # normalization
     d_fk_net, d_gt_net = choose_d_model(args.d_name, fk_batch, gt_batch, x_batch)
