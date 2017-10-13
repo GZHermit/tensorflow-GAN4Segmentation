@@ -91,7 +91,7 @@ def get_data_from_dataset(data_dir, name, is_val=False):
         filepath += 'Segmentation/val.txt' if is_val else 'Segmentation/train_dup.txt'
         print("file path:" + filepath)
         with open(filepath, mode='r') as f:
-            imgs_name = f.readlines()[:10]
+            imgs_name = f.readlines()
         for i in range(len(imgs_name)):
             imgs_name[i] = imgs_name[i].strip('\n')
         for name in imgs_name:

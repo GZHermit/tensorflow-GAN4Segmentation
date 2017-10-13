@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from models.generator import choose_generator
+from models.discriminator import choose_discriminator
 from models.discriminator import Discriminator, Discriminator_addx, Discriminator_add_vgg
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
@@ -39,19 +40,6 @@ def convert_to_calculateloss(raw_output, num_classes, label_batch):
     logits = tf.gather(raw_prediction, indices)  # [?, num_classes]
 
     return label, logits
-
-
-def choose_d_model(d_name, fk_batch, gt_batch, image_batch):
-    if d_name == 'disc':
-        d_fk_net = Discriminator({'seg': fk_batch})
-        d_gt_net = Discriminator({'seg': gt_batch}, reuse=True)
-    elif d_name == 'disc_addx':
-        d_fk_net = Discriminator_addx({'seg': fk_batch, 'data': image_batch})
-        d_gt_net = Discriminator_addx({'seg': gt_batch, 'data': image_batch}, reuse=True)
-    elif d_name == 'disc_add_vgg':
-        d_fk_net = Discriminator_add_vgg({'seg': fk_batch, 'data': image_batch})
-        d_gt_net = Discriminator_add_vgg({'seg': gt_batch, 'data': image_batch}, reuse=True)
-    return d_fk_net, d_gt_net
 
 
 def train(args):
@@ -90,7 +78,7 @@ def train(args):
     gt_batch = tf.where(tf.equal(gt_batch, args.ignore_label), pre_batch, gt_batch)
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
     x_batch = tf.train.batch([(reader.image + img_mean) / 255., ], args.batch_size)  # normalization
-    d_fk_net, d_gt_net = choose_d_model(args.d_name, fk_batch, gt_batch, x_batch)
+    d_fk_net, d_gt_net = choose_discriminator(args.d_name, fk_batch, gt_batch, x_batch)
     d_fk_pred = d_fk_net.get_output()  # fake segmentation result in d
     d_gt_pred = d_gt_net.get_output()  # ground-truth result in d
 

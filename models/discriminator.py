@@ -1,6 +1,16 @@
 from models.network import NetWork
 
-
+def choose_discriminator(d_name, fk_batch, gt_batch, image_batch):
+    if d_name == 'disc':
+        d_fk_net = Discriminator({'seg': fk_batch})
+        d_gt_net = Discriminator({'seg': gt_batch}, reuse=True)
+    elif d_name == 'disc_addx':
+        d_fk_net = Discriminator_addx({'seg': fk_batch, 'data': image_batch})
+        d_gt_net = Discriminator_addx({'seg': gt_batch, 'data': image_batch}, reuse=True)
+    elif d_name == 'disc_add_vgg':
+        d_fk_net = Discriminator_add_vgg({'seg': fk_batch, 'data': image_batch})
+        d_gt_net = Discriminator_add_vgg({'seg': gt_batch, 'data': image_batch}, reuse=True)
+    return d_fk_net, d_gt_net
 class Discriminator(NetWork):
     def setup(self, *args):
         name = 'discriminator/'
