@@ -199,7 +199,7 @@ class ImageReader(object):
        masks from the disk, and enqueues them into a TensorFlow queue.
     '''
 
-    def  __init__(self, data_dir, input_size,
+    def __init__(self, data_dir, input_size,
                  random_scale, random_mirror, random_crop, ignore_label, is_val, img_mean, coord):
         '''Initialise an ImageReader.
 

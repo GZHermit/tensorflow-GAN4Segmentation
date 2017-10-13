@@ -39,7 +39,6 @@ class Generator_32(NetWork):
          .conv([1, 1], 4096, [1, 1], reuse=self.reuse, biased=True, relu=True, name=name + 'image_fc7')
          .dropout(keep_prob=0.5, name=name + 'drop7')
          .conv([1, 1], num_classes, [1, 1], reuse=self.reuse, biased=True, relu=False, name=name + 'score_fr'))
-        print('data:', self.layers['data'].get_shape().as_list())
         origin_shape = tf.multiply(tf.shape(self.layers['data']), tf.convert_to_tensor([1, 1, 1, 7]))
 
         (self.feed(name + 'score_fr')
@@ -47,7 +46,7 @@ class Generator_32(NetWork):
                  name=name + 'upscore32'))
 
     def topredict(self, raw_output, origin_shape=None):
-        # raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
+        raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
         raw_output = tf.argmax(raw_output, axis=3)
         prediction = tf.expand_dims(raw_output, dim=3)
         return prediction
@@ -83,11 +82,11 @@ class Generator_16(NetWork):
 
         (self.feed(name + 'image_pool4')
          .conv([1, 1], num_classes, [1, 1], reuse=self.reuse, biased=True, relu=False, name=name + 'score_pool4'))
-        pool_shape = tf.shape(self.layers[name + 'image_pool4'])
+        pool_shape = tf.shape(self.layers[name + 'score_pool4'])
         (self.feed(name + 'score_fr')
          .deconv([4, 4], pool_shape, [2, 2], num_classes, reuse=self.reuse, biased=True, relu=False,
                  name=name + 'upscore2'))
-        (self.feed(name + 'score_fr', name + 'score_pool4')
+        (self.feed(name + 'upscore2', name + 'score_pool4')
          .add(name=name + 'fuse_pool4'))
         origin_shape = tf.multiply(tf.shape(self.layers['data']), tf.convert_to_tensor([1, 1, 1, 7]))
         (self.feed(name + 'fuse_pool4')
@@ -95,7 +94,7 @@ class Generator_16(NetWork):
                  name=name + 'upscore16'))
 
     def topredict(self, raw_output, origin_shape=None):
-        # raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
+        raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
         raw_output = tf.argmax(raw_output, axis=3)
         prediction = tf.expand_dims(raw_output, dim=3)
         return prediction
@@ -131,11 +130,11 @@ class Generator_8(NetWork):
 
         (self.feed(name + 'image_pool3')
          .conv([1, 1], num_classes, [1, 1], reuse=self.reuse, biased=False, relu=False, name=name + 'score_pool3'))
-        pool3_shape = tf.shape(self.layers[name + 'image_pool3'])
+        pool3_shape = tf.shape(self.layers[name + 'score_pool3'])
 
         (self.feed(name + 'image_pool4')
          .conv([1, 1], num_classes, [1, 1], reuse=self.reuse, biased=False, relu=False, name=name + 'score_pool4'))
-        pool4_shape = tf.shape(self.layers[name + 'image_pool4'])
+        pool4_shape = tf.shape(self.layers[name + 'score_pool4'])
 
         (self.feed(name + 'score_fr')
          .deconv([4, 4], pool4_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
@@ -153,7 +152,7 @@ class Generator_8(NetWork):
                  name=name + 'upscore8'))
 
     def topredict(self, raw_output, origin_shape=None):
-        # raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
+        raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
         raw_output = tf.argmax(raw_output, axis=3)
         prediction = tf.expand_dims(raw_output, dim=3)
         return prediction

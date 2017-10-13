@@ -189,9 +189,7 @@ class NetWork(object):
         # Verify that the padding is acceptable
         self.validate_padding(padding)
         # Get the number of channels in the input
-        print("input:", input.get_shape().as_list())
         input_channel = input.get_shape().as_list()[-1]
-        print("output:", output_shape.get_shape().as_list())
         # Verify that the grouping parameter is valid
         assert input_channel % group == 0
         # Convolution for a given input and kernel
@@ -199,7 +197,6 @@ class NetWork(object):
                                                          padding=padding)
         with tf.variable_scope(name, reuse=reuse) as scope:
             kernel = self.make_var('weights', shape=[kernel[0], kernel[1], output_channel, input_channel / group])
-            print("k_shape:", kernel.shape)
             if group == 1:
                 # This is the common-case. Convolve the input without any further complications.
                 output = deconvolve(input, kernel)

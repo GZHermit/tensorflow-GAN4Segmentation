@@ -92,11 +92,11 @@ def train(args):
     tf.summary.scalar('g_loss_train', g_loss_var)
     tf.summary.scalar('iou_train', iou_var)
     tf.summary.scalar('accuracy_train', accuracy_var)
-    for grad, var in g_gradients:
-        tf.summary.histogram(var.op.name + "/gradients", grad)
-
-    for var in tf.trainable_variables():
-        tf.summary.histogram(var.op.name + "/values", var)
+    # for grad, var in g_gradients:
+    #     tf.summary.histogram(var.op.name + "/gradients", grad)
+    #
+    # for var in tf.trainable_variables():
+    #     tf.summary.histogram(var.op.name + "/values", var)
 
     summary_op = tf.summary.merge_all()
     summary_writer = tf.summary.FileWriter(args.log_dir, graph=tf.get_default_graph(), max_queue=5)
@@ -126,7 +126,6 @@ def train(args):
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: now_step}
-
         g_loss_, _, _ = sess.run([g_loss_var, train_all_op, metrics_op], feed_dict)
 
         if step > 0 and step % args.save_pred_every == 0:
