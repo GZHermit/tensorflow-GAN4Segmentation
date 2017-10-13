@@ -11,12 +11,27 @@ def load_weight(weight_path, saver, sess):
         var_list = saver
         data_dict = np.load(weight_path, encoding='latin1').item()
         for op_name in data_dict:
-            if 'fc' in op_name: continue
-            w, b = data_dict[op_name][0], data_dict[op_name][1]
-            w_var = [v for v in var_list if op_name in v.op.name and 'weights' in v.op.name][0]
-            b_var = [v for v in var_list if op_name in v.op.name and 'biases' in v.op.name][0]
-            sess.run(w_var.assign(w))
-            sess.run(b_var.assign(b))
+            if 'fc' in op_name:
+                if op_name == 'fc6':
+                    w, b = data_dict[op_name][0], data_dict[op_name][1]
+                    w = w.reshape(7, 7, 512, 4096)
+                    w_var = [v for v in var_list if op_name in v.op.name and 'weights' in v.op.name][0]
+                    b_var = [v for v in var_list if op_name in v.op.name and 'biases' in v.op.name][0]
+                    sess.run(w_var.assign(w))
+                    sess.run(b_var.assign(b))
+                if op_name == 'fc7':
+                    w, b = data_dict[op_name][0], data_dict[op_name][1]
+                    w = w.reshape(1, 1, 4096, 4096)
+                    w_var = [v for v in var_list if op_name in v.op.name and 'weights' in v.op.name][0]
+                    b_var = [v for v in var_list if op_name in v.op.name and 'biases' in v.op.name][0]
+                    sess.run(w_var.assign(w))
+                    sess.run(b_var.assign(b))
+            elif 'conv' in op_name:
+                w, b = data_dict[op_name][0], data_dict[op_name][1]
+                w_var = [v for v in var_list if op_name in v.op.name and 'weights' in v.op.name][0]
+                b_var = [v for v in var_list if op_name in v.op.name and 'biases' in v.op.name][0]
+                sess.run(w_var.assign(w))
+                sess.run(b_var.assign(b))
         return
     else:
         try:

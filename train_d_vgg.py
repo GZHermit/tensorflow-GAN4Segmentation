@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from models.generator import Generator
+from models.generator import choose_generator
 from models.discriminator import Discriminator, Discriminator_addx, Discriminator_add_vgg
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
@@ -82,10 +82,10 @@ def train(args):
         print("Data is ready!")
 
     ## load model
-    g_net = Generator({'data': image_batch})
+    g_net = choose_generator(args.g_name, image_batch)
     score_map = g_net.get_output()
     fk_batch = tf.nn.softmax(score_map, dim=-1)
-    pre_batch = tf.arg_max(fk_batch,dimension=-1)
+    pre_batch = tf.arg_max(fk_batch, dimension=-1)
     gt_batch = tf.image.resize_nearest_neighbor(label_batch, score_map.get_shape()[1:3])
     gt_batch = tf.where(tf.equal(gt_batch, args.ignore_label), pre_batch, gt_batch)
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)

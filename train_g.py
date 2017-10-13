@@ -4,36 +4,17 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from models.generator import Generator
-from models.discriminator import Discriminator, Discriminator_addx, Discriminator_add_vgg
+from models.generator import choose_generator
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
 from utils.image_reader import ImageReader
 
 
-def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
-    score_map_max = tf.reduce_max(score_map, axis=3, keep_dims=False)
-    y_il = tf.maximum(score_map_max, tf.constant(tau, tf.float32, label_batch.get_shape().as_list()[:-1]))
-    _s_il = 1.0 - score_map_max
-    _y_il = 1.0 - y_il
-    a = tf.expand_dims(tf.div(_y_il, _s_il), axis=3)
-    y_ic = tf.concat([a for i in range(num_classes)], axis=3)
-    y_ic = tf.multiply(score_map, y_ic)
-    b = tf.expand_dims(y_il, axis=3)
-    y_il_ = tf.concat([b for i in range(num_classes)], axis=3)
-    lab_hot = tf.squeeze(tf.one_hot(label_batch, num_classes, dtype=tf.float32), axis=3)
-    gt_batch = tf.where(tf.equal(lab_hot, 1.), y_il_, y_ic)
-    gt_batch = tf.clip_by_value(gt_batch, 0., 1.)
-
-    return gt_batch
-
-
-def convert_to_calculateloss(raw_output, num_classes, label_batch):
-    label_proc = prepare_label(label_batch, raw_output.get_shape()[1:3],
+def convert_to_calculateloss(score_map, num_classes, label_batch):
+    label_proc = prepare_label(label_batch, tf.shape(score_map)[1:3],
                                num_classes=num_classes, one_hot=False)  # [batch_size, h, w]
     raw_groundtruth = tf.reshape(label_proc, [-1, ])
-    raw_prediction = tf.reshape(raw_output, [-1, num_classes])
-
+    raw_prediction = tf.reshape(score_map, [-1, num_classes])
     indices = tf.squeeze(tf.where(tf.less_equal(raw_groundtruth, num_classes - 1)), 1)
     label = tf.cast(tf.gather(raw_groundtruth, indices), tf.int32)  # [?, ]
     logits = tf.gather(raw_prediction, indices)  # [?, num_classes]
@@ -46,7 +27,7 @@ def train(args):
     img_mean = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
     tf.set_random_seed(args.random_seed)
     coord = tf.train.Coordinator()
-    print("d_model_name:", args.d_name)
+    print("g_model_name:", args.g_name)
     print("lambda:", args.lambd)
     print("learning_rate:", args.learning_rate)
     print("is_val:", args.is_val)
@@ -68,8 +49,8 @@ def train(args):
         print("Data is ready!")
 
     ## load model
-    g_net = Generator({'data': image_batch})
-    score_map = g_net.get_output()
+    g_net = choose_generator(args.g_name, image_batch)
+    score_map = g_net.get_output()  # [batch_size, h, w, num_classes]
 
     label, logits = convert_to_calculateloss(score_map, args.num_classes, label_batch)
     predict_label = tf.argmax(logits, axis=1)
@@ -131,7 +112,7 @@ def train(args):
     sess.run(local_init)
 
     ## set saver
-    saver_all = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=1000)
+    saver_all = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=50)
     trained_step = 0
     if os.path.exists(args.restore_from + 'checkpoint'):
         trained_step = load_weight(args.restore_from, saver_all, sess)
@@ -145,7 +126,8 @@ def train(args):
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: now_step}
-        g_loss_, g_loss1, _, _ = sess.run([g_loss_var, g_loss, train_all_op, metrics_op], feed_dict)
+
+        g_loss_, _, _ = sess.run([g_loss_var, train_all_op, metrics_op], feed_dict)
 
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)

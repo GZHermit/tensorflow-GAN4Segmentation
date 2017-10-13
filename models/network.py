@@ -181,6 +181,45 @@ class NetWork(object):
             return output
 
     @layer
+    def deconv(self, input, kernel, output_shape, strides, output_channel, name, reuse=None,
+               relu=False,
+               padding='SAME',
+               group=1,
+               biased=False):
+        # Verify that the padding is acceptable
+        self.validate_padding(padding)
+        # Get the number of channels in the input
+        print("input:", input.get_shape().as_list())
+        input_channel = input.get_shape().as_list()[-1]
+        print("output:", output_shape.get_shape().as_list())
+        # Verify that the grouping parameter is valid
+        assert input_channel % group == 0
+        # Convolution for a given input and kernel
+        deconvolve = lambda i, k: tf.nn.conv2d_transpose(i, k, output_shape, [1, strides[0], strides[1], 1],
+                                                         padding=padding)
+        with tf.variable_scope(name, reuse=reuse) as scope:
+            kernel = self.make_var('weights', shape=[kernel[0], kernel[1], output_channel, input_channel / group])
+            print("k_shape:", kernel.shape)
+            if group == 1:
+                # This is the common-case. Convolve the input without any further complications.
+                output = deconvolve(input, kernel)
+            else:
+                # Split the input into groups and then convolve each of them independently
+                input_groups = tf.split(input, group, 3)
+                kernel_groups = tf.split(kernel, group, 3)
+                output_groups = [deconvolve(i, k) for i, k in zip(input_groups, kernel_groups)]
+                # Concatenate the groups
+                output = tf.concat(output_groups, 3)
+            # Add the biases
+            if biased:
+                biases = self.make_var('biases', [output_channel])
+                output = tf.nn.bias_add(output, biases)
+            if relu:
+                # ReLU non-linearity
+                output = tf.nn.relu(output, name=scope.name)
+            return output
+
+    @layer
     def relu(self, input, name):
         return tf.nn.relu(input, name=name)
 

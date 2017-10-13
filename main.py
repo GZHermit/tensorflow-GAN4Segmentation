@@ -14,7 +14,6 @@ import train_d_vgg
 
 
 def start(args):
-
     if args.is_val:
         print("Go into the validation stage")
         val_include_d.val(args)
@@ -30,14 +29,14 @@ def get_arguments():
       A list of parsed arguments.
     """
 
-    BATCH_SIZE = 4
-    DATA_DIRECTORY = ['/media/fanyang/workspace/DataSet/voc+sbd/VOC2012/', ]
+    BATCH_SIZE = 1
+    DATA_DIRECTORY = ['/home/gzh/Workspace/Dataset/VOC2012/', ]
     IGNORE_LABEL = 255
-    IMG_SIZE = (513, 513)
-    LEARNING_RATE = 3e-5
+    IMG_SIZE = None  # None means we won't use any scaleing or mirroring or resizeing,the input image is origin image.
+    LEARNING_RATE = 1e-4
     MOMENTUM = 0.9
     NUM_CLASSES = 21
-    NUM_STEPS = 50000 + 1
+    NUM_STEPS = 100000 + 1
     POWER = 0.9
     RANDOM_SEED = 1234
     IS_VAL = False
@@ -45,6 +44,7 @@ def get_arguments():
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0005
     D_NAME = 'disc_add_vgg'
+    G_NAME = 'vgg_16'
     LAMBD = 0.1
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
@@ -72,6 +72,8 @@ def get_arguments():
                         help="Random seed to have reproducible results.")
     parser.add_argument("--d_name", type=str, default=D_NAME,
                         help="which d_model can be choosed")
+    parser.add_argument("--g_name", type=str, default=G_NAME,
+                        help="which g_model can be choosed")
     parser.add_argument("--save_num_images", type=int, default=SAVE_NUM_IMAGES,
                         help="How many images to save.")
     parser.add_argument("--save_pred_every", type=int, default=SAVE_PRED_EVERY,
@@ -97,10 +99,11 @@ def get_arguments():
 if __name__ == '__main__':
     parser, args = get_arguments()
 
-    RESTORE_FROM = './weights/%s/%f/' % (args.d_name, args.learning_rate)
-    LOG_DIR = './tblogs/val/%s/%f/' % (args.d_name, args.learning_rate) if args.is_val else './tblogs/train/%s/%f/' % (
-        args.d_name, args.learning_rate)
-    BASEWEIGHT_FROM = './weights/init/vgg16.npy'
+    RESTORE_FROM = './weights/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
+    LOG_DIR = './tblogs/val/%s/%s/%f/' % (
+        args.g_name, args.d_name, args.learning_rate) if args.is_val else './tblogs/train/%s/%s/%f/' % (
+        args.g_name, args.d_name, args.learning_rate)
+    BASEWEIGHT_FROM = '/home/gzh/Workspace/Weight/vgg16/vgg16.npy'
     parser.add_argument("--log_dir", type=str, default=LOG_DIR,
                         help="Where to save tensorboard log of the model.")
     parser.add_argument("--restore_from", type=str, default=RESTORE_FROM,

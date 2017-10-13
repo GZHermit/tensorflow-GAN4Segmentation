@@ -3,11 +3,20 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from models.generator import Generator
+from models.generator import Generator_32, Generator_16, Generator_8
 from models.discriminator import Discriminator_add_vgg
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
 from utils.image_reader import read_labeled_image_list
+
+
+def choose_generator(g_name, image_batch):
+    if '32' in g_name:
+        return Generator_32({'data': image_batch})
+    elif '16' in g_name:
+        return Generator_16({'data': image_batch})
+    elif '8' in g_name:
+        return Generator_8({'data': image_batch})
 
 
 def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
@@ -25,6 +34,7 @@ def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     gt_batch = tf.clip_by_value(gt_batch, 0., 1.)
 
     return gt_batch
+
 
 def convert_to_calculateloss(raw_output, label_batch, num_classes):
     raw_output = tf.image.resize_bilinear(raw_output, tf.shape(label_batch)[1:3])
@@ -69,7 +79,7 @@ def val(args):
     print("data load completed!")
 
     ## load model
-    g_net = Generator(inputs={'data': image_batch})
+    g_net = choose_generator(args.g_name, image_batch)
     score_map = g_net.get_output()
     fk_batch = tf.nn.softmax(score_map, dim=-1)
     gt_batch = tf.image.resize_nearest_neighbor(label_batch, score_map.get_shape()[1:3])

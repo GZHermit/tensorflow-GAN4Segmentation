@@ -91,7 +91,7 @@ def get_data_from_dataset(data_dir, name, is_val=False):
         filepath += 'Segmentation/val.txt' if is_val else 'Segmentation/train_dup.txt'
         print("file path:" + filepath)
         with open(filepath, mode='r') as f:
-            imgs_name = f.readlines()
+            imgs_name = f.readlines()[:10]
         for i in range(len(imgs_name)):
             imgs_name[i] = imgs_name[i].strip('\n')
         for name in imgs_name:
@@ -199,7 +199,7 @@ class ImageReader(object):
        masks from the disk, and enqueues them into a TensorFlow queue.
     '''
 
-    def __init__(self, data_dir, input_size,
+    def  __init__(self, data_dir, input_size,
                  random_scale, random_mirror, random_crop, ignore_label, is_val, img_mean, coord):
         '''Initialise an ImageReader.
 
@@ -233,5 +233,5 @@ class ImageReader(object):
         Returns:
           Two tensors of size (batch_size, h, w, {3, 1}) for images and masks.'''
 
-        image_batch, label_batch = tf.train.batch([self.image, self.label], batch_size)
+        image_batch, label_batch = tf.train.batch([self.image, self.label], batch_size, dynamic_pad=True)
         return image_batch, label_batch
