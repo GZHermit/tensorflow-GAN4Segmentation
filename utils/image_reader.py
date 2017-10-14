@@ -110,7 +110,7 @@ def get_data_from_dataset(data_dir, name, is_val=False):
 
         print("file path:" + filepath)
         with open(filepath, mode='r') as f:
-            imgs_name = f.readlines()
+            imgs_name = f.readlines()[:5]
         for i in range(len(imgs_name)):
             imgs_name[i] = imgs_name[i].strip()
         for name in imgs_name:

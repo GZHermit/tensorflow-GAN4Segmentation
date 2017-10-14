@@ -14,7 +14,7 @@ from utils.image_reader import ImageReader
 
 def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     score_map_max = tf.reduce_max(score_map, axis=3, keep_dims=False)
-    y_il = tf.maximum(score_map_max, tf.constant(tau, tf.float32, label_batch.get_shape().as_list()[:-1]))
+    y_il = tf.maximum(score_map_max, tf.fill(tf.shape(label_batch)[:-1], tau))
     _s_il = 1.0 - score_map_max
     _y_il = 1.0 - y_il
     a = tf.expand_dims(tf.div(_y_il, _s_il), axis=3)
@@ -29,11 +29,11 @@ def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     return gt_batch
 
 
-def convert_to_calculateloss(raw_output, num_classes, label_batch):
-    label_proc = prepare_label(label_batch, raw_output.get_shape()[1:3],
+def convert_to_calculateloss(score_map, num_classes, label_batch):
+    label_proc = prepare_label(label_batch, tf.shape(score_map)[1:3],
                                num_classes=num_classes, one_hot=False)  # [batch_size, h, w]
     raw_groundtruth = tf.reshape(label_proc, [-1, ])
-    raw_prediction = tf.reshape(raw_output, [-1, num_classes])
+    raw_prediction = tf.reshape(score_map, [-1, num_classes])
 
     indices = tf.squeeze(tf.where(tf.less_equal(raw_groundtruth, num_classes - 1)), 1)
     label = tf.cast(tf.gather(raw_groundtruth, indices), tf.int32)  # [?, ]
@@ -48,7 +48,8 @@ def train(args):
     tf.set_random_seed(args.random_seed)
     coord = tf.train.Coordinator()
     eps = 1e-8
-    print("d_model_name:", args.d_name)
+    print("g_name:", args.g_name)
+    print("d_name:", args.d_name)
     print("lambda:", args.lamb)
     print("learning_rate:", args.learning_rate)
     print("is_val:", args.is_val)

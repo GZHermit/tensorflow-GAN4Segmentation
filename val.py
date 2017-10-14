@@ -3,19 +3,10 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from models.generator import Generator_32, Generator_16, Generator_8
+from models.generator import choose_generator
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
 from utils.image_reader import read_labeled_image_list
-
-
-def choose_generator(g_name, image_batch):
-    if '32' in g_name:
-        return Generator_32({'data': image_batch})
-    elif '16' in g_name:
-        return Generator_16({'data': image_batch})
-    elif '8' in g_name:
-        return Generator_8({'data': image_batch})
 
 
 def convert_to_calculateloss(raw_output, label_batch, num_classes):
