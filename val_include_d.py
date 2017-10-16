@@ -73,7 +73,7 @@ def val(args):
     g_net = choose_generator(args.g_name, image_batch)
     score_map = g_net.get_output()
     fk_batch = tf.nn.softmax(score_map, dim=-1)
-    gt_batch = tf.image.resize_nearest_neighbor(label_batch, score_map.get_shape()[1:3])
+    gt_batch = tf.image.resize_nearest_neighbor(label_batch, tf.shape(score_map)[1:3])
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
     x_batch = tf.train.batch([(image_batch + img_mean) / 255., ], args.batch_size)  # normalization
     d_fk_net = Discriminator_add_vgg({'seg': fk_batch, 'data': x_batch})

@@ -75,8 +75,8 @@ def train(args):
     lr = tf.scalar_mul(base_lr,
                        tf.pow((1 - iterstep / args.num_steps), args.power))  # learning rate reduce with the time
 
-    g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
-                                                                                                         g_trainable_var)
+    # g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
+    #                                                                                                      g_trainable_var)
     train_g_op = tf.train.MomentumOptimizer(learning_rate=lr,
                                             momentum=args.momentum).minimize(g_loss,
                                                                              var_list=g_trainable_var)

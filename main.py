@@ -38,13 +38,13 @@ def get_arguments():
     NUM_CLASSES = 21
     NUM_STEPS = 100000 + 1
     POWER = 0.9
-    RANDOM_SEED = 1234
+    RANDOM_SEED = 1337
     IS_VAL = False
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0005
     D_NAME = 'disc_add_vgg'
-    G_NAME = 'vgg_16'
+    G_NAME = 'vgg_32'
     LAMBD = 0.1
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
