@@ -2,6 +2,7 @@
 import argparse
 import os
 import time
+import random
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -9,17 +10,25 @@ time.sleep(2)
 
 import val
 import val_include_d
-import train_g
+import train_g_vgg
+import train_g_resnet
 import train_d_vgg
 
 
 def start(args):
     if args.is_val:
         print("Go into the validation stage")
-        val_include_d.val(args)
+        # val_include_d.val(args)
+        val.val(args)
     else:
         print("Go into the train stage")
-        train_g.train(args)
+        if args.d_name != 'null':
+            train_d_vgg.train(args)
+        else:
+            if '50' in args.g_name:
+                train_g_resnet.train(args)
+            else:
+                train_g_vgg.train(args)
 
 
 def get_arguments():
@@ -38,13 +47,13 @@ def get_arguments():
     NUM_CLASSES = 21
     NUM_STEPS = 100000 + 1
     POWER = 0.9
-    RANDOM_SEED = 1337
+    RANDOM_SEED = random.randint(0, 2 ** 31 - 1)
     IS_VAL = False
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
-    WEIGHT_DECAY = 0.0005
-    D_NAME = 'disc_add_vgg'
-    G_NAME = 'vgg_32'
+    WEIGHT_DECAY = 0.0003
+    D_NAME = 'disc_add_vgg'  # options:disc_add_res50
+    G_NAME = 'vgg_32'  # options:vgg_32,vgg_16,vgg_8,res_50
     LAMBD = 0.1
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
@@ -103,12 +112,17 @@ if __name__ == '__main__':
     LOG_DIR = './tblogs/val/%s/%s/%f/' % (
         args.g_name, args.d_name, args.learning_rate) if args.is_val else './tblogs/train/%s/%s/%f/' % (
         args.g_name, args.d_name, args.learning_rate)
-    BASEWEIGHT_FROM = '/home/gzh/Workspace/Weight/vgg16/vgg16.npy'
+    VALID_IMAGE_STORE_PATH = './valid_imgs/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
+    BASEWEIGHT_FROM = {'res50': '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt',
+                       'vgg16': '/home/gzh/Workspace/Weight/vgg16/vgg16.npy',
+                       'g': ''}  # /home/shared4TB/GZhao/Weights/resnet_v1_50.ckpt
     parser.add_argument("--log_dir", type=str, default=LOG_DIR,
                         help="Where to save tensorboard log of the model.")
     parser.add_argument("--restore_from", type=str, default=RESTORE_FROM,
                         help="Where restore model parameters from.")
-    parser.add_argument("--baseweight_from", type=str, default=BASEWEIGHT_FROM,
+    parser.add_argument("--valid_image_store_path", type=str, default=VALID_IMAGE_STORE_PATH,
+                        help="Where store valid image files")
+    parser.add_argument("--baseweight_from", type=dict, default=BASEWEIGHT_FROM,
                         help="Where base model weight from")
     args = parser.parse_args()
     start(args)

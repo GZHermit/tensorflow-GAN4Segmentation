@@ -74,7 +74,14 @@ def random_crop_and_pad_image_and_labels(image, label, crop_h, crop_w, ignore_la
     return img_crop, label_crop
 
 
-def get_data_from_dataset(data_dir, name, is_val=False):
+def get_data_from_dataset(data_dir, name, is_val=False, valid_image_store_path='/path/to/arbitrary/'):
+    '''
+    :param data_dir:
+    :param name:
+    :param is_val:
+    :param valid_image_store_path: when you use the val.py,you will use it.otherwise ignore it please.
+    :return:
+    '''
     base_url = data_dir
     images, masks, png_names = [], [], []
     if name == 'VOC2012':
@@ -97,7 +104,7 @@ def get_data_from_dataset(data_dir, name, is_val=False):
         for name in imgs_name:
             images.append(data_url['JPEGImages'] + name + '.jpg')
             masks.append(data_url['SegmentationLabel'] + name + '.png')
-            png_names.append('./imgs/val/' + name + '.png')
+            png_names.append(valid_image_store_path + name + '.png')
         return images, masks, png_names
 
     elif name == 'sbd':
@@ -110,7 +117,7 @@ def get_data_from_dataset(data_dir, name, is_val=False):
 
         print("file path:" + filepath)
         with open(filepath, mode='r') as f:
-            imgs_name = f.readlines()[:5]
+            imgs_name = f.readlines()
         for i in range(len(imgs_name)):
             imgs_name[i] = imgs_name[i].strip()
         for name in imgs_name:
@@ -119,7 +126,7 @@ def get_data_from_dataset(data_dir, name, is_val=False):
         return images, masks, []
 
 
-def read_labeled_image_list(data_dir, is_val=False):
+def read_labeled_image_list(data_dir, is_val=False, valid_image_store_path='/path/to/arbitrary/'):
     """Reads txt file containing paths to images and ground truth masks.
 
     Args:
@@ -134,7 +141,7 @@ def read_labeled_image_list(data_dir, is_val=False):
     for base_url in data_dir:
         ti, tm, tn = None, None, None
         if 'VOC2012' in base_url:
-            ti, tm, tn = get_data_from_dataset(base_url, 'VOC2012', is_val)
+            ti, tm, tn = get_data_from_dataset(base_url, 'VOC2012', is_val, valid_image_store_path)
             if is_val:
                 return ti, tm, tn
         elif 'sbd' in base_url:
@@ -200,7 +207,8 @@ class ImageReader(object):
     '''
 
     def __init__(self, data_dir, input_size,
-                 random_scale, random_mirror, random_crop, ignore_label, is_val, img_mean, coord):
+                 random_scale, random_mirror, random_crop, ignore_label, is_val, img_mean,
+                 coord):
         '''Initialise an ImageReader.
 
         Args:

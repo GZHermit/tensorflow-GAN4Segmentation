@@ -325,3 +325,7 @@ class NetWork(object):
     @layer
     def resize(self, input, new_size, name):
         return tf.image.resize_bilinear(input, new_size, name=name)
+
+    @layer
+    def resize_nn(self, input, new_size, name):
+        return tf.image.resize_nearest_neighbor(input, new_size, name=name)

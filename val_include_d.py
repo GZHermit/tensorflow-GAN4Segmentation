@@ -1,18 +1,20 @@
 # _*_ coding:utf-8
+import os
 import time
 
-import tensorflow as tf
 import numpy as np
-from models.generator import choose_generator
+import tensorflow as tf
+
 from models.discriminator import Discriminator_add_vgg
-from utils.data_handle import save_weight, load_weight
-from utils.image_process import prepare_label, inv_preprocess, decode_labels
+from models.generator import choose_generator
+from utils.data_handle import load_weight
+from utils.image_process import inv_preprocess, decode_labels
 from utils.image_reader import read_labeled_image_list
 
 
 def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     score_map_max = tf.reduce_max(score_map, axis=3, keep_dims=False)
-    y_il = tf.maximum(score_map_max, tf.constant(tau, tf.float32, label_batch.get_shape().as_list()[:-1]))
+    y_il = tf.maximum(score_map_max, tf.fill(tf.shape(label_batch)[:-1], tau))
     _s_il = 1.0 - score_map_max
     _y_il = 1.0 - y_il
     a = tf.expand_dims(tf.div(_y_il, _s_il), axis=3)
@@ -60,13 +62,13 @@ def val(args):
     tf.set_random_seed(args.random_seed)
 
     ## load data
-    image_list, label_list, png_list = read_labeled_image_list(args.data_dir, is_val=True)
+    image_list, label_list, png_list = read_labeled_image_list(args.data_dir, is_val=True,
+                                                               valid_image_store_path=args.valid_image_store_path)
     num_val = len(image_list)
     image_name = tf.placeholder(dtype=tf.string)
     label_name = tf.placeholder(dtype=tf.string)
     png_name = tf.placeholder(dtype=tf.string)
     image_batch, label_batch = get_validate_data(image_name, label_name, img_mean)
-
     print("data load completed!")
 
     ## load model
@@ -75,7 +77,7 @@ def val(args):
     fk_batch = tf.nn.softmax(score_map, dim=-1)
     gt_batch = tf.image.resize_nearest_neighbor(label_batch, tf.shape(score_map)[1:3])
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
-    x_batch = tf.train.batch([(image_batch + img_mean) / 255., ], args.batch_size)  # normalization
+    x_batch = (image_batch + img_mean) / 255.  # normalization
     d_fk_net = Discriminator_add_vgg({'seg': fk_batch, 'data': x_batch})
     d_gt_net = Discriminator_add_vgg({'seg': gt_batch, 'data': x_batch}, reuse=True)
     d_fk_pred = d_fk_net.get_output()  # fake segmentation result in d
@@ -114,6 +116,8 @@ def val(args):
     saver = tf.train.Saver(var_list=tf.global_variables())
     _ = load_weight(args.restore_from, saver, sess)
 
+    if not os.path.exists(args.valid_image_store_path):
+        os.makedirs(args.valid_image_store_path)
     print("validation begining")
 
     for step in range(num_val):

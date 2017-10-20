@@ -1,4 +1,5 @@
 # _*_ coding:utf-8
+import os
 import time
 
 import tensorflow as tf
@@ -42,7 +43,8 @@ def val(args):
     tf.set_random_seed(args.random_seed)
 
     ## load data
-    image_list, label_list, png_list = read_labeled_image_list(args.data_dir, is_val=True)
+    image_list, label_list, png_list = read_labeled_image_list(args.data_dir, is_val=True,
+                                                               valid_image_store_path=args.valid_image_store_path)
     num_val = len(image_list)
     image_name = tf.placeholder(dtype=tf.string)
     label_name = tf.placeholder(dtype=tf.string)
@@ -74,7 +76,7 @@ def val(args):
     tf.summary.scalar(name='iou_val', tensor=iou)
     tf.summary.scalar(name='acc_val', tensor=acc)
     sum_op = tf.summary.merge_all()
-    sum_writer = tf.summary.FileWriter(args.log_dir, max_queue=20)
+    sum_writer = tf.summary.FileWriter(args.log_dir, max_queue=5)
 
     sess = tf.Session()
     global_init = tf.global_variables_initializer()
@@ -84,6 +86,9 @@ def val(args):
 
     saver = tf.train.Saver(var_list=tf.global_variables())
     _ = load_weight(args.restore_from, saver, sess)
+
+    if not os.path.exists(args.valid_image_store_path):
+        os.makedirs(args.valid_image_store_path)
 
     print("validation begining")
 

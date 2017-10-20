@@ -6,12 +6,12 @@ import tensorflow as tf
 import numpy as np
 
 
-def load_weight(weight_path, saver, sess):
+def load_weight(weight_path, saver, sess, include_d=False):
     if '.npy' in weight_path:
         var_list = saver
         data_dict = np.load(weight_path, encoding='latin1').item()
         for op_name in data_dict:
-            if 'fc' in op_name:
+            if 'fc' in op_name and not include_d:
                 if op_name == 'fc6':
                     w, b = data_dict[op_name][0], data_dict[op_name][1]
                     w = w.reshape(7, 7, 512, 4096)
@@ -35,14 +35,18 @@ def load_weight(weight_path, saver, sess):
         return
     else:
         try:
-            cp_path = tf.train.latest_checkpoint(weight_path)
-            print("load path: %s" % cp_path)
-            saver.restore(sess, cp_path)
-            print("already loaded the prior model, go on training.")
-            return int(re.search(r'-(.*)', cp_path).group(1))
+            if '.ckpt' not in weight_path:
+                cp_path = tf.train.latest_checkpoint(weight_path)
+                print("load path: %s" % cp_path)
+                saver.restore(sess, cp_path)
+                print("already loaded the prior model, go on training.")
+                return int(re.search(r'-(.*)', cp_path).group(1))
+            else:
+                print("load path: %s" % weight_path)
+                saver.restore(sess, weight_path)
         except:
-            print("fail to load model weight!")
-            return
+             print("fail to load model weight!")
+             return
     return
 
 

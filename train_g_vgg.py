@@ -62,7 +62,10 @@ def train(args):
     g_trainable_var = tf.trainable_variables()
 
     ## set loss
-    g_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
+    mce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
+    l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
+    g_loss = tf.reduce_mean(mce_loss) + tf.add_n(l2_losses)
+
     g_loss_var, g_loss_op = tf.metrics.mean(g_loss)
     iou_var, iou_op = tf.metrics.mean_iou(label, predict_label, args.num_classes)
     accuracy_var, acc_op = tf.metrics.accuracy(label, predict_label)
@@ -117,7 +120,10 @@ def train(args):
     if os.path.exists(args.restore_from + 'checkpoint'):
         trained_step = load_weight(args.restore_from, saver_all, sess)
     else:
-        load_weight(args.baseweight_from, g_restore_var, sess)
+        if '50' in args.g_name:
+            load_weight(args.baseweight_from['res50'], g_restore_var, sess)
+        elif 'vgg' in args.g_name:
+            load_weight(args.baseweight_from['vgg16'], g_restore_var, sess)
 
     threads = tf.train.start_queue_runners(sess, coord)
     print("all setting has been done,training start!")
@@ -126,7 +132,9 @@ def train(args):
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: now_step}
-        g_loss_, _, _ = sess.run([g_loss_var, train_all_op, metrics_op], feed_dict)
+        # img, lab, s, ll, lt, pl, pb = sess.run(
+        #     [image_batch, label_batch, score_map, label, logits, predict_label, predict_batch], feed_dict)
+        _, _, g_loss_ = sess.run([train_all_op, metrics_op, g_loss_var], feed_dict)
 
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)

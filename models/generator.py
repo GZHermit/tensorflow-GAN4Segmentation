@@ -86,6 +86,7 @@ class Generator_vgg_16(NetWork):
         (self.feed(name + 'image_pool4')
          .conv([1, 1], num_classes, [1, 1], reuse=self.reuse, biased=True, relu=False, name=name + 'score_pool4'))
         pool_shape = tf.shape(self.layers[name + 'score_pool4'])
+
         (self.feed(name + 'score_fr')
          .resize(pool_shape[1:3], name=name + 'upscore2'))
         # .deconv([4, 4], pool_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
@@ -93,6 +94,7 @@ class Generator_vgg_16(NetWork):
         (self.feed(name + 'upscore2', name + 'score_pool4')
          .add(name=name + 'fuse_pool4'))
         origin_shape = tf.multiply(tf.shape(self.layers['data']), tf.convert_to_tensor([1, 1, 1, 7]))
+
         (self.feed(name + 'fuse_pool4')
          .resize(origin_shape[1:3], name=name + 'upscore16'))
         # .deconv([32, 32], origin_shape, [16, 16], num_classes, reuse=self.reuse, biased=False, relu=False,
@@ -328,11 +330,11 @@ class Generator_resnet50(NetWork):
                    'bn4f_branch2c')
          .add(name='res4f')
          .relu(name='res4f_relu')
-         .conv([1, 1], 2048, [1, 1], biased=False, relu=False, name='res5a_branch1')
+         .conv([1, 1], 2048, [2, 2], biased=False, relu=False, name='res5a_branch1')
          .batch_normalization(is_training=is_training, activation_fn=None, name='bn5a_branch1'))
 
         (self.feed('res4e_relu')
-         .conv([1, 1], 512, [1, 1], biased=False, relu=False, name='res5a_branch2a')
+         .conv([1, 1], 512, [2, 2], biased=False, relu=False, name='res5a_branch2a')
          .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='bn5a_branch2a')
          .conv([3, 3], 512, [1, 1], padding='SAME', biased=False, relu=False, name='res5a_branch2b')
          .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='bn5a_branch2b')
@@ -357,7 +359,7 @@ class Generator_resnet50(NetWork):
          .conv([1, 1], 512, [1, 1], biased=False, relu=False, name='res5c_branch2a')
          .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='bn5c_branch2a')
          .conv([3, 3], 512, [1, 1], padding='SAME', biased=False, relu=False, name='res5c_branch2b')
-         .batch_normalization(activation_fn=tf.nn.relu, name='bn5c_branch2b', is_training=is_training)
+         .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='bn5c_branch2b')
          .conv([1, 1], 2048, [1, 1], biased=False, relu=False, name='res5c_branch2c')
          .batch_normalization(is_training=is_training, activation_fn=None, name='bn5c_branch2c'))
 
@@ -365,16 +367,16 @@ class Generator_resnet50(NetWork):
                    'bn5c_branch2c')
          .add(name='res5c')
          .relu(name='res5c_relu')
-         .atrous_conv(3, 3, num_classes, 6, padding='SAME', relu=False, name='fc1_voc12_c0'))
+         .atrous_conv([3, 3], num_classes, 6, padding='SAME', relu=False, name='fc1_voc12_c0'))
 
         (self.feed('res5c_relu')
-         .atrous_conv(3, 3, num_classes, 12, padding='SAME', relu=False, name='fc1_voc12_c1'))
+         .atrous_conv([3, 3], num_classes, 12, padding='SAME', relu=False, name='fc1_voc12_c1'))
 
         (self.feed('res5c_relu')
-         .atrous_conv(3, 3, num_classes, 18, padding='SAME', relu=False, name='fc1_voc12_c2'))
+         .atrous_conv([3, 3], num_classes, 18, padding='SAME', relu=False, name='fc1_voc12_c2'))
 
         (self.feed('res5c_relu')
-         .atrous_conv(3, 3, num_classes, 24, padding='SAME', relu=False, name='fc1_voc12_c3'))
+         .atrous_conv([3, 3], num_classes, 24, padding='SAME', relu=False, name='fc1_voc12_c3'))
 
         (self.feed('fc1_voc12_c0',
                    'fc1_voc12_c1',
@@ -383,4 +385,7 @@ class Generator_resnet50(NetWork):
          .add(name='fc1_voc12'))
 
     def topredict(self, raw_output, origin_shape=None):
-        pass
+        raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
+        raw_output = tf.argmax(raw_output, axis=3)
+        prediction = tf.expand_dims(raw_output, dim=3)
+        return prediction

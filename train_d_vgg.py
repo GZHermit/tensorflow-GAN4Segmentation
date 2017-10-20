@@ -6,7 +6,6 @@ import tensorflow as tf
 
 from models.generator import choose_generator
 from models.discriminator import choose_discriminator
-from models.discriminator import Discriminator, Discriminator_addx, Discriminator_add_vgg
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
 from utils.image_reader import ImageReader
@@ -24,7 +23,7 @@ def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     y_il_ = tf.concat([b for i in range(num_classes)], axis=3)
     lab_hot = tf.squeeze(tf.one_hot(label_batch, num_classes, dtype=tf.float32), axis=3)
     gt_batch = tf.where(tf.equal(lab_hot, 1.), y_il_, y_ic)
-    gt_batch = tf.clip_by_value(gt_batch, 0., 1.)
+    gt_batch = tf.clip_by_value(gt_batch, 0. + 1e-8, 1. - 1e-8)
 
     return gt_batch
 
@@ -34,7 +33,6 @@ def convert_to_calculateloss(score_map, num_classes, label_batch):
                                num_classes=num_classes, one_hot=False)  # [batch_size, h, w]
     raw_groundtruth = tf.reshape(label_proc, [-1, ])
     raw_prediction = tf.reshape(score_map, [-1, num_classes])
-
     indices = tf.squeeze(tf.where(tf.less_equal(raw_groundtruth, num_classes - 1)), 1)
     label = tf.cast(tf.gather(raw_groundtruth, indices), tf.int32)  # [?, ]
     logits = tf.gather(raw_prediction, indices)  # [?, num_classes]
@@ -50,7 +48,7 @@ def train(args):
     eps = 1e-8
     print("g_name:", args.g_name)
     print("d_name:", args.d_name)
-    print("lambda:", args.lamb)
+    print("lambda:", args.lambd)
     print("learning_rate:", args.learning_rate)
     print("is_val:", args.is_val)
     print("---------------------------------")
@@ -74,11 +72,11 @@ def train(args):
     g_net = choose_generator(args.g_name, image_batch)
     score_map = g_net.get_output()
     fk_batch = tf.nn.softmax(score_map, dim=-1)
-    pre_batch = tf.arg_max(fk_batch, dimension=-1)
-    gt_batch = tf.image.resize_nearest_neighbor(label_batch, score_map.get_shape()[1:3])
+    pre_batch = tf.expand_dims(tf.cast(tf.argmax(fk_batch, axis=-1), tf.uint8), axis=-1)
+    gt_batch = tf.image.resize_nearest_neighbor(label_batch, tf.shape(score_map)[1:3])
     gt_batch = tf.where(tf.equal(gt_batch, args.ignore_label), pre_batch, gt_batch)
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
-    x_batch = tf.train.batch([(reader.image + img_mean) / 255., ], args.batch_size)  # normalization
+    x_batch = tf.train.batch([(reader.image + img_mean) / 255., ], args.batch_size, dynamic_pad=True)  # normalization
     d_fk_net, d_gt_net = choose_discriminator(args.d_name, fk_batch, gt_batch, x_batch)
     d_fk_pred = d_fk_net.get_output()  # fake segmentation result in d
     d_gt_pred = d_gt_net.get_output()  # ground-truth result in d
@@ -93,14 +91,21 @@ def train(args):
     vgg_restore_var = [v for v in tf.global_variables() if 'discriminator' in v.name and 'image' in v.name]
     g_var = [v for v in tf.trainable_variables() if 'discriminator' not in v.name]
     d_var = [v for v in tf.trainable_variables() if 'discriminator' in v.name and 'image' not in v.name]
-    g_trainable_var = [v for v in g_var if 'beta' not in v.name or 'gamma' not in v.name]
+    # g_trainable_var = [v for v in g_var if 'beta' not in v.name or 'gamma' not in v.name] #batch_norm training open
+    g_trainable_var = g_var
     d_trainable_var = d_var
 
     ## set loss
     mce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
-    g_bce_loss = tf.reduce_mean(tf.log(d_fk_pred + eps))
-    g_loss = mce_loss - args.lamb * g_bce_loss
-    d_loss = tf.reduce_mean(tf.constant(-1.0) * [tf.log(d_gt_pred + eps) + tf.log(1. - d_fk_pred + eps)])
+    # g_bce_loss = tf.reduce_mean(tf.log(d_fk_pred + eps))
+    g_bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fk_pred), logits=d_fk_pred)
+    g_loss = mce_loss - args.lambd * g_bce_loss
+    # d_loss = tf.reduce_mean(tf.constant(-1.0) * [tf.log(d_gt_pred + eps) + tf.log(1. - d_fk_pred + eps)])
+    d_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
+             + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred), logits=d_fk_pred)
+
+    fk_score_var = tf.reduce_mean(d_fk_pred)
+    gt_score_var = tf.reduce_mean(d_gt_pred)
     mce_loss_var, mce_loss_op = tf.metrics.mean(mce_loss)
     g_bce_loss_var, g_bce_loss_op = tf.metrics.mean(g_bce_loss)
     g_loss_var, g_loss_op = tf.metrics.mean(g_loss)
@@ -122,16 +127,15 @@ def train(args):
                                                                                                                d_trainable_var)
     grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
     grad_gt_oi = tf.gradients(d_gt_pred, gt_batch, name='grad_gt_oi')[0]
-    grad_fk_img_oi = tf.gradients(d_fk_pred, x_batch, name='grad_fk_img_oi')[0]
-    grad_gt_img_oi = tf.gradients(d_gt_pred, x_batch, name='grad_gt_img_oi')[0]
+    grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
+    grad_gt_img_oi = tf.gradients(d_gt_pred, image_batch, name='grad_gt_img_oi')[0]
 
     train_g_op = tf.train.MomentumOptimizer(learning_rate=lr,
                                             momentum=args.momentum).minimize(g_loss,
                                                                              var_list=g_trainable_var)
-    train_d_op = tf.train.MomentumOptimizer(learning_rate=lr * 100,
+    train_d_op = tf.train.MomentumOptimizer(learning_rate=lr * 10,
                                             momentum=args.momentum).minimize(d_loss,
                                                                              var_list=d_trainable_var)
-    train_all_op = tf.group(train_g_op, train_d_op)
 
     ## set summary
     vs_image = tf.py_func(inv_preprocess, [image_batch, args.save_num_images, img_mean], tf.uint8)
@@ -166,6 +170,7 @@ def train(args):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
+
     global_init = tf.global_variables_initializer()
     local_init = tf.local_variables_initializer()
     sess.run(global_init)
@@ -177,20 +182,29 @@ def train(args):
     if os.path.exists(args.restore_from + 'checkpoint'):
         trained_step = load_weight(args.restore_from, saver_all, sess)
     else:
-        load_weight('/data/rui.wu/GZHermit/Workspace/SegModels/dataset/models/vgg16.npy', vgg_restore_var, sess)
+        load_weight(args.baseweight_from['vgg16'], vgg_restore_var, sess,True)
         saver_g = tf.train.Saver(var_list=g_restore_var, max_to_keep=2)
-        load_weight(args.baseweight_from, saver_g, sess)
+        load_weight(args.baseweight_from['g'], saver_g, sess) # the weight is the completely g model
 
     threads = tf.train.start_queue_runners(sess, coord)
-    print("all settings have been done,training start!")
+    print("all setting has been done,training start!")
 
     ## start training
+    def auto_setting_train_steps(mode):
+        if mode == 0:
+            return 5, 1
+        elif mode == 1:
+            return 1, 5
+        else:
+            return 1, 1
+
+    d_train_steps = 5
+    g_train_steps = 1
+    flags = [0 for i in range(3)]
+
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
-        feed_dict = {iterstep: now_step}
-        d_train_steps = 5 if step < 5 else 1
-        g_train_steps = 5 if step > 500 else 1
-
+        feed_dict = {iterstep: step}
         for i in range(d_train_steps):
             _, _ = sess.run([train_d_op, metrics_op], feed_dict)
 
@@ -198,6 +212,21 @@ def train(args):
             g_loss_, mce_loss_, g_bce_loss_, d_loss_, _, _ = sess.run(
                 [g_loss_var, mce_loss_var, g_bce_loss_var, d_loss_var, train_g_op, metrics_op],
                 feed_dict)
+
+        ########################
+        fk_score_, gt_score_ = sess.run([fk_score_var, gt_score_var], feed_dict)
+        if fk_score_ > 0.48 and fk_score_ < 0.52:
+            flags[0] += 1
+            flags[1] = flags[2] = 0
+        elif gt_score_ - fk_score_ > 0.3:
+            flags[1] += 1
+            flags[0] = flags[2] = 0
+        else:
+            flags[2] += 1
+            flags[0] = flags[1] = 0
+        if max(flags) > 100:
+            d_train_steps, g_train_steps = auto_setting_train_steps(flags.index(max(flags)))
+        ########################
 
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)
