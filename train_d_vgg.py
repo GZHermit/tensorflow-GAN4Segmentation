@@ -24,6 +24,9 @@ def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     lab_hot = tf.squeeze(tf.one_hot(label_batch, num_classes, dtype=tf.float32), axis=3)
     gt_batch = tf.where(tf.equal(lab_hot, 1.), y_il_, y_ic)
     gt_batch = tf.clip_by_value(gt_batch, 0. + 1e-8, 1. - 1e-8)
+    c = tf.expand_dims(tf.reduce_mean(gt_batch, axis=3), axis=3)
+    nor_sum = tf.concat([c for i in range(num_classes)], axis=3)
+    gt_batch = gt_batch / nor_sum
 
     return gt_batch
 

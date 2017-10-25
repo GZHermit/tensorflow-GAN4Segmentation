@@ -5,30 +5,34 @@ import time
 import random
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-time.sleep(2)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+# time.sleep(2)
 
 import val
 import val_include_d
 import train_g_vgg
 import train_g_resnet
 import train_d_vgg
+import train_multitask_vgg
 
 
 def start(args):
-    if args.is_val:
-        print("Go into the validation stage")
-        # val_include_d.val(args)
-        val.val(args)
+    if args.is_multitask:
+        train_multitask_vgg.train(args)
     else:
-        print("Go into the train stage")
-        if args.d_name != 'null':
-            train_d_vgg.train(args)
+        if args.is_val:
+            print("Go into the validation stage")
+            # val_include_d.val(args)
+            val.val(args)
         else:
-            if '50' in args.g_name:
-                train_g_resnet.train(args)
+            print("Go into the train stage")
+            if args.d_name != 'null':
+                train_d_vgg.train(args)
             else:
-                train_g_vgg.train(args)
+                if '50' in args.g_name:
+                    train_g_resnet.train(args)
+                else:
+                    train_g_vgg.train(args)
 
 
 def get_arguments():
@@ -39,7 +43,7 @@ def get_arguments():
     """
 
     BATCH_SIZE = 1
-    DATA_DIRECTORY = ['/home/gzh/Workspace/Dataset/VOC2012/', ]
+    DATA_DIRECTORY = ['/home/shared4TB/GZhao/Dataset/VOCdevkit/VOC2012/', ]
     IGNORE_LABEL = 255
     IMG_SIZE = None  # None means we won't use any scaleing or mirroring or resizeing,the input image is origin image.
     LEARNING_RATE = 1e-4
@@ -49,6 +53,7 @@ def get_arguments():
     POWER = 0.9
     RANDOM_SEED = random.randint(0, 2 ** 31 - 1)
     IS_VAL = False
+    IS_MULTITASK = True
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0003
@@ -91,6 +96,8 @@ def get_arguments():
                         help="Regularisation parameter for L2-loss.")
     parser.add_argument("--is_val", type=bool, default=IS_VAL,
                         help="Use the Val")
+    parser.add_argument("--is_multitask", type=bool, default=IS_MULTITASK,
+                        help="train with using the multitask")
     parser.add_argument("--is_training", action="store_true",
                         help="Whether to updates the running means and variances during the training.")
     parser.add_argument("--not_restore_last", action="store_true",
@@ -107,15 +114,21 @@ def get_arguments():
 
 if __name__ == '__main__':
     parser, args = get_arguments()
-
-    RESTORE_FROM = './weights/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
-    LOG_DIR = './tblogs/val/%s/%s/%f/' % (
-        args.g_name, args.d_name, args.learning_rate) if args.is_val else './tblogs/train/%s/%s/%f/' % (
-        args.g_name, args.d_name, args.learning_rate)
-    VALID_IMAGE_STORE_PATH = './valid_imgs/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
-    BASEWEIGHT_FROM = {'res50': '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt',
-                       'vgg16': '/home/gzh/Workspace/Weight/vgg16/vgg16.npy',
-                       'g': ''}  # /home/shared4TB/GZhao/Weights/resnet_v1_50.ckpt
+    if args.is_multitask:
+        RESTORE_FROM = './weights/is_multi/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
+        LOG_DIR = './tblogs/val/is_multi/%s/%s/%f/' % (
+            args.g_name, args.d_name, args.learning_rate) if args.is_val else './tblogs/train/is_multi/%s/%s/%f/' % (
+            args.g_name, args.d_name, args.learning_rate)
+        VALID_IMAGE_STORE_PATH = './valid_imgs/is_multi/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
+    else:
+        RESTORE_FROM = './weights/no_multi/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
+        LOG_DIR = './tblogs/val/no_multi/%s/%s/%f/' % (
+            args.g_name, args.d_name, args.learning_rate) if args.is_val else './tblogs/train/no_multi/%s/%s/%f/' % (
+            args.g_name, args.d_name, args.learning_rate)
+        VALID_IMAGE_STORE_PATH = './valid_imgs/no_multi/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
+    BASEWEIGHT_FROM = {'res50': '/home/shared4TB/GZhao/Weights/resnet_v1_50.ckpt',
+                       'vgg16': '/home/shared4TB/GZhao/Weights/vgg16.npy',
+                       'g': '/home/daixl/GZHermit/weights/vgg_16/disc_add_vgg/0.000100'}
     parser.add_argument("--log_dir", type=str, default=LOG_DIR,
                         help="Where to save tensorboard log of the model.")
     parser.add_argument("--restore_from", type=str, default=RESTORE_FROM,
