@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from models.generator import choose_generator
+from models.generator_multitask import choose_generator
 from models.discriminator_multitask import choose_discriminator
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
@@ -72,14 +72,17 @@ def train(args):
         print("Data is ready!")
 
     ## load model
-    g_net = choose_generator(args.g_name, image_batch)
+    image_normal_batch = tf.train.batch([(reader.image + img_mean) / 255., ], args.batch_size, dynamic_pad=True)
+    g_net, g_net_x = choose_generator(args.g_name, image_batch, image_normal_batch)
     score_map = g_net.get_output()
     fk_batch = tf.nn.softmax(score_map, dim=-1)
     pre_batch = tf.expand_dims(tf.cast(tf.argmax(fk_batch, axis=-1), tf.uint8), axis=-1)
     gt_batch = tf.image.resize_nearest_neighbor(label_batch, tf.shape(score_map)[1:3])
     gt_batch = tf.where(tf.equal(gt_batch, args.ignore_label), pre_batch, gt_batch)
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
-    x_batch = g_net.get_appointed_layer('generator/image_conv5_3')
+    # x_batch = g_net.get_appointed_layer('generator/image_conv5_3')
+    # x_batch = (x_batch + img_mean) / 255.
+    x_batch = g_net_x.get_appointed_layer('generator/image_conv5_3')
     d_fk_net, d_gt_net = choose_discriminator(args.d_name, fk_batch, gt_batch, x_batch)
     d_fk_pred = d_fk_net.get_output()  # fake segmentation result in d
     d_gt_pred = d_gt_net.get_output()  # ground-truth result in d
@@ -94,7 +97,7 @@ def train(args):
     vgg_restore_var = [v for v in tf.global_variables() if 'discriminator' in v.name and 'image' in v.name]
     g_var = [v for v in tf.trainable_variables() if 'discriminator' not in v.name]
     d_var = [v for v in tf.trainable_variables() if 'discriminator' in v.name and 'image' not in v.name]
-    # g_trainable_var = [v for v in g_var if 'beta' not in v.name or 'gamma' not in v.name] #batch_norm training open
+    # g_trainable_var = [v for v in g_var if 'beta' not in v.name or 'gamma' not in v.name]  # batch_norm training open
     g_trainable_var = g_var
     d_trainable_var = d_var
 
@@ -207,6 +210,8 @@ def train(args):
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: step}
+        x, fk, gt = sess.run([x_batch, fk_batch, gt_batch], feed_dict)
+        print(max(fk), min(fk), max(gt), min(gt))
         for i in range(d_train_steps):
             _, _ = sess.run([train_d_op, metrics_op], feed_dict)
 

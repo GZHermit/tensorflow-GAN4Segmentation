@@ -5,8 +5,8 @@ import time
 import random
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-# time.sleep(2)
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+time.sleep(2)
 
 import val
 import val_include_d
@@ -17,15 +17,16 @@ import train_multitask_vgg
 
 
 def start(args):
-    if args.is_multitask:
-        train_multitask_vgg.train(args)
+    if args.is_val:
+        print("Go into the validation stage")
+        # val_include_d.val(args)
+        val.val(args)
+
     else:
-        if args.is_val:
-            print("Go into the validation stage")
-            # val_include_d.val(args)
-            val.val(args)
+        print("Go into the train stage")
+        if args.is_multitask:
+            train_multitask_vgg.train(args)
         else:
-            print("Go into the train stage")
             if args.d_name != 'null':
                 train_d_vgg.train(args)
             else:
@@ -43,7 +44,7 @@ def get_arguments():
     """
 
     BATCH_SIZE = 1
-    DATA_DIRECTORY = ['/home/shared4TB/GZhao/Dataset/VOCdevkit/VOC2012/', ]
+    DATA_DIRECTORY = ['/home/gzh/Workspace/Dataset/VOC2012/', ]
     IGNORE_LABEL = 255
     IMG_SIZE = None  # None means we won't use any scaleing or mirroring or resizeing,the input image is origin image.
     LEARNING_RATE = 1e-4
@@ -57,8 +58,8 @@ def get_arguments():
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0003
-    D_NAME = 'disc_add_vgg'  # options:disc_add_res50
-    G_NAME = 'vgg_32'  # options:vgg_32,vgg_16,vgg_8,res_50
+    D_NAME = 'disc_add_vgg'  # options:disc_add_vgg, disc_add_res50
+    G_NAME = 'vgg_16'  # options:vgg_32,vgg_16,vgg_8,res_50
     LAMBD = 0.1
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
@@ -126,9 +127,14 @@ if __name__ == '__main__':
             args.g_name, args.d_name, args.learning_rate) if args.is_val else './tblogs/train/no_multi/%s/%s/%f/' % (
             args.g_name, args.d_name, args.learning_rate)
         VALID_IMAGE_STORE_PATH = './valid_imgs/no_multi/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
-    BASEWEIGHT_FROM = {'res50': '/home/shared4TB/GZhao/Weights/resnet_v1_50.ckpt',
-                       'vgg16': '/home/shared4TB/GZhao/Weights/vgg16.npy',
-                       'g': '/home/daixl/GZHermit/weights/vgg_16/disc_add_vgg/0.000100'}
+
+    # BASEWEIGHT_FROM = {'res50': '/home/shared4TB/GZhao/Weights/resnet_v1_50.ckpt',
+    #                    'vgg16': '/home/shared4TB/GZhao/Weights/vgg16.npy',
+    #                    'g': '/home/daixl/GZHermit/weights/vgg_16/disc_add_vgg/0.000100'}
+    BASEWEIGHT_FROM = {'res50': '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt',
+                       'vgg16': '/home/gzh/Workspace/Weight/vgg16/vgg16.npy',
+                       'g': '/home/gzh/Workspace/Weight/weights/vgg_16/disc_add_vgg/0.000100'}
+
     parser.add_argument("--log_dir", type=str, default=LOG_DIR,
                         help="Where to save tensorboard log of the model.")
     parser.add_argument("--restore_from", type=str, default=RESTORE_FROM,

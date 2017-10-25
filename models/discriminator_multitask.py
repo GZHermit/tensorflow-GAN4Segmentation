@@ -3,10 +3,10 @@ import tensorflow as tf
 
 
 def choose_discriminator(d_name, fk_batch, gt_batch, feature_batch):
-    if d_name == 'disc_vgg16':
+    if d_name == 'disc_add_vgg':
         d_fk_net = Discriminator_add_vgg({'seg': fk_batch, 'data': feature_batch})
         d_gt_net = Discriminator_add_vgg({'seg': gt_batch, 'data': feature_batch}, reuse=True)
-    elif d_name == 'disc_resnet50':
+    elif d_name == 'disc_add_res50':
         d_fk_net = Discriminator_add_res50({'seg': fk_batch, 'data': feature_batch})
         d_gt_net = Discriminator_add_res50({'seg': gt_batch, 'data': feature_batch}, reuse=True)
     return d_fk_net, d_gt_net
