@@ -12,21 +12,17 @@ from utils.image_reader import ImageReader
 
 
 def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
-    score_map_max = tf.reduce_max(score_map, axis=3, keep_dims=False)
-    y_il = tf.maximum(score_map_max, tf.fill(tf.shape(label_batch)[:-1], tau))
-    _s_il = 1.0 - score_map_max
-    _y_il = 1.0 - y_il
-    a = tf.expand_dims(tf.div(_y_il, _s_il), axis=3)
-    y_ic = tf.concat([a for i in range(num_classes)], axis=3)
-    y_ic = tf.multiply(score_map, y_ic)
-    b = tf.expand_dims(y_il, axis=3)
-    y_il_ = tf.concat([b for i in range(num_classes)], axis=3)
     lab_hot = tf.squeeze(tf.one_hot(label_batch, num_classes, dtype=tf.float32), axis=3)
-    gt_batch = tf.where(tf.equal(lab_hot, 1.), y_il_, y_ic)
-    gt_batch = tf.clip_by_value(gt_batch, 0. + 1e-8, 1. - 1e-8)
-    c = tf.expand_dims(tf.reduce_mean(gt_batch, axis=3), axis=3)
-    nor_sum = tf.concat([c for i in range(num_classes)], axis=3)
-    gt_batch = gt_batch / nor_sum
+
+    score_map = tf.nn.softmax(score_map, dim=-1)
+    score_map_max = tf.reduce_max(score_map, axis=3, keep_dims=True)
+    score_map_max = tf.maximum(score_map_max, tf.fill(tf.shape(score_map_max), tau))
+    score_map_maxs = tf.concat([score_map_max for i in range(num_classes)], axis=3)
+    gt_batch = tf.where(tf.equal(lab_hot, 1.), score_map_maxs, score_map)
+    y_il = 1. - score_map_maxs
+    s_il = 1. - score_map
+    y_ic = tf.multiply(score_map, tf.div(y_il, s_il))
+    gt_batch = tf.where(tf.equal(lab_hot, 0.), y_ic, gt_batch)
 
     return gt_batch
 
@@ -105,7 +101,7 @@ def train(args):
     mce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
     # g_bce_loss = tf.reduce_mean(tf.log(d_fk_pred + eps))
     g_bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fk_pred), logits=d_fk_pred)
-    g_loss = mce_loss - args.lambd * g_bce_loss
+    g_loss = mce_loss + args.lambd * g_bce_loss
     # d_loss = tf.reduce_mean(tf.constant(-1.0) * [tf.log(d_gt_pred + eps) + tf.log(1. - d_fk_pred + eps)])
     d_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
              + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred), logits=d_fk_pred)
@@ -129,17 +125,17 @@ def train(args):
 
     g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
                                                                                                          g_trainable_var)
-    d_gradients = tf.train.MomentumOptimizer(learning_rate=lr * 100, momentum=args.momentum).compute_gradients(d_loss,
-                                                                                                               d_trainable_var)
-    grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
-    grad_gt_oi = tf.gradients(d_gt_pred, gt_batch, name='grad_gt_oi')[0]
-    grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
-    grad_gt_img_oi = tf.gradients(d_gt_pred, image_batch, name='grad_gt_img_oi')[0]
+    d_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(d_loss,
+                                                                                                         d_trainable_var)
+    # grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
+    # grad_gt_oi = tf.gradients(d_gt_pred, gt_batch, name='grad_gt_oi')[0]
+    # grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
+    # grad_gt_img_oi = tf.gradients(d_gt_pred, image_batch, name='grad_gt_img_oi')[0]
 
     train_g_op = tf.train.MomentumOptimizer(learning_rate=lr,
                                             momentum=args.momentum).minimize(g_loss,
                                                                              var_list=g_trainable_var)
-    train_d_op = tf.train.MomentumOptimizer(learning_rate=lr * 10,
+    train_d_op = tf.train.MomentumOptimizer(learning_rate=lr,
                                             momentum=args.momentum).minimize(d_loss,
                                                                              var_list=d_trainable_var)
 
@@ -157,10 +153,10 @@ def train(args):
     tf.summary.scalar('g_bce_loss_train', -1. * g_bce_loss_var)
     tf.summary.scalar('iou_train', iou_var)
     tf.summary.scalar('accuracy_train', accuracy_var)
-    tf.summary.scalar('grad_fk_oi', tf.reduce_mean(tf.abs(grad_fk_oi)))
-    tf.summary.scalar('grad_gt_oi', tf.reduce_mean(tf.abs(grad_gt_oi)))
-    tf.summary.scalar('grad_fk_img_oi', tf.reduce_mean(tf.abs(grad_fk_img_oi)))
-    tf.summary.scalar('grad_gt_img_oi', tf.reduce_mean(tf.abs(grad_gt_img_oi)))
+    # tf.summary.scalar('grad_fk_oi', tf.reduce_mean(tf.abs(grad_fk_oi)))
+    # tf.summary.scalar('grad_gt_oi', tf.reduce_mean(tf.abs(grad_gt_oi)))
+    # tf.summary.scalar('grad_fk_img_oi', tf.reduce_mean(tf.abs(grad_fk_img_oi)))
+    # tf.summary.scalar('grad_gt_img_oi', tf.reduce_mean(tf.abs(grad_gt_img_oi)))
 
     for grad, var in g_gradients + d_gradients:
         tf.summary.histogram(var.op.name + "/gradients", grad)
@@ -210,8 +206,7 @@ def train(args):
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: step}
-        x, fk, gt = sess.run([x_batch, fk_batch, gt_batch], feed_dict)
-        print(max(fk), min(fk), max(gt), min(gt))
+        x, fk, gt, d_fk, d_gt = sess.run([x_batch, fk_batch, gt_batch, d_fk_pred, d_gt_pred], feed_dict)
         for i in range(d_train_steps):
             _, _ = sess.run([train_d_op, metrics_op], feed_dict)
 
@@ -238,7 +233,7 @@ def train(args):
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)
 
-        if step % 50 == 0 or step == args.num_steps - 1:
+        if step % 1 == 0 or step == args.num_steps - 1:
             print('step={} d_loss={} g_loss={} mce_loss={} g_bce_loss_={}'.format(now_step, d_loss_,
                                                                                   g_loss_,
                                                                                   mce_loss_,

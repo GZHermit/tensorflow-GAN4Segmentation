@@ -11,7 +11,7 @@ def choose_generator(g_name, image_batch, image_normal_batch):
     elif '8' in g_name:
         return Generator_vgg_8({'data': image_batch}), Generator_vgg_8({'data': image_normal_batch}, reuse=True)
     elif '50' in g_name:
-        return Generator_resnet50({'data': image_batch}), Generator_resnet50({'data': image_normal_batch}, reuse=True)
+        return Generator_res50({'data': image_batch}), Generator_res50({'data': image_normal_batch}, reuse=True)
 
 
 class Generator_vgg_32(NetWork):
@@ -168,7 +168,7 @@ class Generator_vgg_8(NetWork):
         return prediction
 
 
-class Generator_resnet50(NetWork):
+class Generator_res50(NetWork):
     def setup(self, is_training, num_classes):
         (self.feed('data')
          .conv([7, 7], 64, [2, 2], biased=False, relu=False, name='conv1')
