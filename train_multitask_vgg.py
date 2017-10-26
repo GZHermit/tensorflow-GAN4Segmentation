@@ -124,9 +124,9 @@ def train(args):
                        tf.pow((1 - iterstep / args.num_steps), args.power))  # learning rate reduce with the time
 
     g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
-                                                                                                         g_trainable_var)
-    d_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(d_loss,
-                                                                                                         d_trainable_var)
+                                                                                                         var_list=g_trainable_var)
+    d_gradients = tf.train.MomentumOptimizer(learning_rate=lr * 10, momentum=args.momentum).compute_gradients(d_loss,
+                                                                                                              var_list=d_trainable_var)
     # grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
     # grad_gt_oi = tf.gradients(d_gt_pred, gt_batch, name='grad_gt_oi')[0]
     # grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
@@ -135,7 +135,7 @@ def train(args):
     train_g_op = tf.train.MomentumOptimizer(learning_rate=lr,
                                             momentum=args.momentum).minimize(g_loss,
                                                                              var_list=g_trainable_var)
-    train_d_op = tf.train.MomentumOptimizer(learning_rate=lr,
+    train_d_op = tf.train.MomentumOptimizer(learning_rate=lr * 10,
                                             momentum=args.momentum).minimize(d_loss,
                                                                              var_list=d_trainable_var)
 

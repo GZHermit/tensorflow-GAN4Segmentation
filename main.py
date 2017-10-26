@@ -47,7 +47,7 @@ def get_arguments():
     DATA_DIRECTORY = ['/home/gzh/Workspace/Dataset/VOC2012/', ]
     IGNORE_LABEL = 255
     IMG_SIZE = None  # None means we won't use any scaleing or mirroring or resizeing,the input image is origin image.
-    LEARNING_RATE = 1e-4
+    LEARNING_RATE = 1e-4 # if the model includes d, we should change it to 3e-5
     MOMENTUM = 0.9
     NUM_CLASSES = 21
     NUM_STEPS = 100000 + 1
