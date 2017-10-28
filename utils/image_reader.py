@@ -79,7 +79,7 @@ def get_data_from_dataset(data_dir, name, is_val=False, valid_image_store_path='
     :param data_dir:
     :param name:
     :param is_val:
-    :param valid_image_store_path: when you use the val.py,you will use it.otherwise ignore it please.
+    :param valid_image_store_path: when you use the val_g.py,you will use it.otherwise ignore it please.
     :return:
     '''
     base_url = data_dir
@@ -131,8 +131,7 @@ def read_labeled_image_list(data_dir, is_val=False, valid_image_store_path='/pat
 
     Args:
       data_dir: path to the directory with images and masks.
-      data_list: path to the file with lines of the form '/path/to/image /path/to/mask'.
-
+      valid_image_store_path: the path that store the valided images if you want
     Returns:
       Two lists with all file names for images and masks, respectively.
     """
@@ -228,7 +227,7 @@ class ImageReader(object):
         self.images = tf.convert_to_tensor(self.image_list, dtype=tf.string)
         self.labels = tf.convert_to_tensor(self.label_list, dtype=tf.string)
         self.queue = tf.train.slice_input_producer([self.images, self.labels],
-                                                   shuffle=input_size is not None)  # not shuffling if it is val
+                                                   shuffle=is_val is not True)  # not shuffling if it is val
         self.image, self.label = read_images_from_disk(self.queue, self.input_size, random_scale, random_mirror,
                                                        random_crop, ignore_label, img_mean)
 

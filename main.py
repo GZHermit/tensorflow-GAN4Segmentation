@@ -8,8 +8,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 time.sleep(2)
 
-import val
-import val_include_d
+import val_g
+import val_multitask_include_d
+import val_nomulti_include_d
 import train_g_vgg
 import train_g_resnet
 import train_d_vgg
@@ -19,9 +20,13 @@ import train_multitask_vgg
 def start(args):
     if args.is_val:
         print("Go into the validation stage")
-        # val_include_d.val(args)
-        val.val(args)
-
+        if args.is_multitask:
+            val_multitask_include_d.val(args)
+        else:
+            if args.d_name != 'null':
+                val_nomulti_include_d.val(args)
+            else:
+                val_g.val(args)
     else:
         print("Go into the train stage")
         if args.is_multitask:
@@ -47,19 +52,19 @@ def get_arguments():
     DATA_DIRECTORY = ['/home/gzh/Workspace/Dataset/VOC2012/', ]
     IGNORE_LABEL = 255
     IMG_SIZE = None  # None means we won't use any scaleing or mirroring or resizeing,the input image is origin image.
-    LEARNING_RATE = 1e-4 # if the model includes d, we should change it to 3e-5
+    LEARNING_RATE = 1e-4  # if the model includes d, we should change it to 3e-5
     MOMENTUM = 0.9
     NUM_CLASSES = 21
     NUM_STEPS = 100000 + 1
     POWER = 0.9
     RANDOM_SEED = random.randint(0, 2 ** 31 - 1)
-    IS_VAL = False
-    IS_MULTITASK = True
+    IS_VAL = True
+    IS_MULTITASK = False
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0003
-    D_NAME = 'disc_add_vgg'  # options:disc_add_vgg, disc_add_res50
-    G_NAME = 'vgg_16'  # options:vgg_32,vgg_16,vgg_8,res_50
+    D_NAME = 'null'  # options:null, disc_add_vgg, disc_add_res50
+    G_NAME = 'vgg_32'  # options:vgg_32,vgg_16,vgg_8,res_50
     LAMBD = 0.1
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
@@ -114,7 +119,9 @@ def get_arguments():
 
 
 if __name__ == '__main__':
+
     parser, args = get_arguments()
+
     if args.is_multitask:
         RESTORE_FROM = './weights/is_multi/%s/%s/%f/' % (args.g_name, args.d_name, args.learning_rate)
         LOG_DIR = './tblogs/val/is_multi/%s/%s/%f/' % (
@@ -131,6 +138,7 @@ if __name__ == '__main__':
     # BASEWEIGHT_FROM = {'res50': '/home/shared4TB/GZhao/Weights/resnet_v1_50.ckpt',
     #                    'vgg16': '/home/shared4TB/GZhao/Weights/vgg16.npy',
     #                    'g': '/home/daixl/GZHermit/weights/vgg_16/disc_add_vgg/0.000100'}
+
     BASEWEIGHT_FROM = {'res50': '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt',
                        'vgg16': '/home/gzh/Workspace/Weight/vgg16/vgg16.npy',
                        'g': '/home/gzh/Workspace/Weight/weights/vgg_16/disc_add_vgg/0.000100'}

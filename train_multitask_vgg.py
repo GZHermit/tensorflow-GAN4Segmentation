@@ -106,8 +106,8 @@ def train(args):
     d_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
              + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred), logits=d_fk_pred)
 
-    fk_score_var = tf.reduce_mean(d_fk_pred)
-    gt_score_var = tf.reduce_mean(d_gt_pred)
+    fk_score_var = tf.reduce_mean(tf.sigmoid(d_fk_pred))
+    gt_score_var = tf.reduce_mean(tf.sigmoid(d_gt_pred))
     mce_loss_var, mce_loss_op = tf.metrics.mean(mce_loss)
     g_bce_loss_var, g_bce_loss_op = tf.metrics.mean(g_bce_loss)
     g_loss_var, g_loss_op = tf.metrics.mean(g_loss)
@@ -233,7 +233,7 @@ def train(args):
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)
 
-        if step % 1 == 0 or step == args.num_steps - 1:
+        if step % 50 == 0 or step == args.num_steps - 1:
             print('step={} d_loss={} g_loss={} mce_loss={} g_bce_loss_={}'.format(now_step, d_loss_,
                                                                                   g_loss_,
                                                                                   mce_loss_,

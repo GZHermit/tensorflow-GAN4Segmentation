@@ -140,5 +140,10 @@ def read_ckpt():
 
 
 if __name__ == '__main__':
-    check2()
-    # read_ckpt()
+    # check2()
+    # # read_ckpt()
+    g_name = 'vgg_32'
+    if '16' in g_name:
+        print("hehe16")
+    elif '32' in g_name:
+        print("hehe32")
