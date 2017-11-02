@@ -23,6 +23,9 @@ def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     s_il = 1. - score_map
     y_ic = tf.multiply(score_map, tf.div(y_il, s_il))
     gt_batch = tf.where(tf.equal(lab_hot, 0.), y_ic, gt_batch)
+    sums = tf.reduce_sum(gt_batch, axis=3)
+    temp = tf.expand_dims((sums - tf.ones_like(sums, dtype=tf.float32)) / num_classes, axis=3)
+    gt_batch = gt_batch - tf.concat([temp for i in range(num_classes)], axis=3)
 
     return gt_batch
 
@@ -44,7 +47,6 @@ def train(args):
     img_mean = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
     tf.set_random_seed(args.random_seed)
     coord = tf.train.Coordinator()
-    eps = 1e-8
     print("g_name:", args.g_name)
     print("d_name:", args.d_name)
     print("lambda:", args.lambd)
@@ -76,8 +78,6 @@ def train(args):
     gt_batch = tf.image.resize_nearest_neighbor(label_batch, tf.shape(score_map)[1:3])
     gt_batch = tf.where(tf.equal(gt_batch, args.ignore_label), pre_batch, gt_batch)
     gt_batch = convert_to_scaling(fk_batch, args.num_classes, gt_batch)
-    # x_batch = g_net.get_appointed_layer('generator/image_conv5_3')
-    # x_batch = (x_batch + img_mean) / 255.
     x_batch = g_net_x.get_appointed_layer('generator/image_conv5_3')
     d_fk_net, d_gt_net = choose_discriminator(args.d_name, fk_batch, gt_batch, x_batch)
     d_fk_pred = d_fk_net.get_output()  # fake segmentation result in d
@@ -90,21 +90,22 @@ def train(args):
 
     ## get all kinds of variables list
     g_restore_var = [v for v in tf.global_variables() if 'discriminator' not in v.name]
-    vgg_restore_var = [v for v in tf.global_variables() if 'discriminator' in v.name and 'image' in v.name]
-    g_var = [v for v in tf.trainable_variables() if 'discriminator' not in v.name]
-    d_var = [v for v in tf.trainable_variables() if 'discriminator' in v.name and 'image' not in v.name]
+    g_var = [v for v in tf.trainable_variables() if 'generator' in v.name]
+    d_var = [v for v in tf.trainable_variables() if 'discriminator' in v.name]
     # g_trainable_var = [v for v in g_var if 'beta' not in v.name or 'gamma' not in v.name]  # batch_norm training open
     g_trainable_var = g_var
     d_trainable_var = d_var
 
     ## set loss
     mce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
+    # l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
+    # mce_loss = tf.reduce_mean(mce_loss) + tf.add_n(l2_losses)
     # g_bce_loss = tf.reduce_mean(tf.log(d_fk_pred + eps))
-    g_bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fk_pred), logits=d_fk_pred)
-    g_loss = mce_loss + args.lambd * g_bce_loss
+    g_bce_loss = args.lambd * tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fk_pred), logits=d_fk_pred))
+    g_loss = mce_loss + g_bce_loss
     # d_loss = tf.reduce_mean(tf.constant(-1.0) * [tf.log(d_gt_pred + eps) + tf.log(1. - d_fk_pred + eps)])
-    d_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
-             + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred), logits=d_fk_pred)
+    d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
+             + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred), logits=d_fk_pred))
 
     fk_score_var = tf.reduce_mean(tf.sigmoid(d_fk_pred))
     gt_score_var = tf.reduce_mean(tf.sigmoid(d_gt_pred))
@@ -123,14 +124,16 @@ def train(args):
     lr = tf.scalar_mul(base_lr,
                        tf.pow((1 - iterstep / args.num_steps), args.power))  # learning rate reduce with the time
 
-    g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
-                                                                                                         var_list=g_trainable_var)
-    d_gradients = tf.train.MomentumOptimizer(learning_rate=lr * 10, momentum=args.momentum).compute_gradients(d_loss,
-                                                                                                              var_list=d_trainable_var)
-    # grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
-    # grad_gt_oi = tf.gradients(d_gt_pred, gt_batch, name='grad_gt_oi')[0]
-    # grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
-    # grad_gt_img_oi = tf.gradients(d_gt_pred, image_batch, name='grad_gt_img_oi')[0]
+    g_gradients = tf.train.MomentumOptimizer(learning_rate=lr,
+                                             momentum=args.momentum).compute_gradients(g_loss,
+                                                                                       var_list=g_trainable_var)
+    d_gradients = tf.train.MomentumOptimizer(learning_rate=lr * 10,
+                                             momentum=args.momentum).compute_gradients(d_loss,
+                                                                                       var_list=d_trainable_var)
+    grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
+    grad_gt_oi = tf.gradients(d_gt_pred, gt_batch, name='grad_gt_oi')[0]
+    grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
+    grad_gt_img_oi = tf.gradients(d_gt_pred, image_batch, name='grad_gt_img_oi')[0]
 
     train_g_op = tf.train.MomentumOptimizer(learning_rate=lr,
                                             momentum=args.momentum).minimize(g_loss,
@@ -145,18 +148,18 @@ def train(args):
     vs_predict = tf.py_func(decode_labels, [predict_batch, args.save_num_images, args.num_classes], tf.uint8)
     tf.summary.image(name='image collection_train', tensor=tf.concat(axis=2, values=[vs_image, vs_label, vs_predict]),
                      max_outputs=args.save_num_images)
-    tf.summary.scalar('fk_score', tf.reduce_mean(d_fk_pred))
-    tf.summary.scalar('gt_score', tf.reduce_mean(d_gt_pred))
+    tf.summary.scalar('fk_score', fk_score_var)
+    tf.summary.scalar('gt_score', gt_score_var)
     tf.summary.scalar('g_loss_train', g_loss_var)
     tf.summary.scalar('d_loss_train', d_loss_var)
     tf.summary.scalar('mce_loss_train', mce_loss_var)
-    tf.summary.scalar('g_bce_loss_train', -1. * g_bce_loss_var)
+    tf.summary.scalar('g_bce_loss_train', g_bce_loss_var)
     tf.summary.scalar('iou_train', iou_var)
     tf.summary.scalar('accuracy_train', accuracy_var)
-    # tf.summary.scalar('grad_fk_oi', tf.reduce_mean(tf.abs(grad_fk_oi)))
-    # tf.summary.scalar('grad_gt_oi', tf.reduce_mean(tf.abs(grad_gt_oi)))
-    # tf.summary.scalar('grad_fk_img_oi', tf.reduce_mean(tf.abs(grad_fk_img_oi)))
-    # tf.summary.scalar('grad_gt_img_oi', tf.reduce_mean(tf.abs(grad_gt_img_oi)))
+    tf.summary.scalar('grad_fk_oi', tf.reduce_mean(tf.abs(grad_fk_oi)))
+    tf.summary.scalar('grad_gt_oi', tf.reduce_mean(tf.abs(grad_gt_oi)))
+    tf.summary.scalar('grad_fk_img_oi', tf.reduce_mean(tf.abs(grad_fk_img_oi)))
+    tf.summary.scalar('grad_gt_img_oi', tf.reduce_mean(tf.abs(grad_gt_img_oi)))
 
     for grad, var in g_gradients + d_gradients:
         tf.summary.histogram(var.op.name + "/gradients", grad)
@@ -206,7 +209,6 @@ def train(args):
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: step}
-        x, fk, gt, d_fk, d_gt = sess.run([x_batch, fk_batch, gt_batch, d_fk_pred, d_gt_pred], feed_dict)
         for i in range(d_train_steps):
             _, _ = sess.run([train_d_op, metrics_op], feed_dict)
 
@@ -233,7 +235,7 @@ def train(args):
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)
 
-        if step % 50 == 0 or step == args.num_steps - 1:
+        if step % 1 == 0 or step == args.num_steps - 1:
             print('step={} d_loss={} g_loss={} mce_loss={} g_bce_loss_={}'.format(now_step, d_loss_,
                                                                                   g_loss_,
                                                                                   mce_loss_,

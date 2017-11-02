@@ -3,6 +3,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+from math import ceil
 
 
 def layer(op):
@@ -103,6 +104,22 @@ class NetWork(object):
         return tf.get_variable(name, shape, initializer=tf.truncated_normal_initializer(stddev=0.03),
                                trainable=self.trainable)
 
+    def make_deconv_filter(self, name, filter_shape):
+        width, heigh = filter_shape[0], filter_shape[1]
+        f = ceil(width / 2.0)
+        c = (2 * f - 1 - f % 2) / (2.0 * f)
+        bilinear = np.zeros([filter_shape[0], filter_shape[1]])
+        for x in range(width):
+            for y in range(heigh):
+                value = (1 - abs(x / f - c)) * (1 - abs(y / f - c))
+                bilinear[x, y] = value
+        weights = np.zeros(filter_shape)
+        for i in range(filter_shape[2]):
+            weights[:, :, i, i] = bilinear
+
+        init = tf.constant_initializer(value=weights, dtype=tf.float32)
+        return tf.get_variable(name=name, initializer=init, shape=weights.shape)
+
     def validate_padding(self, padding):
         '''Verifies that the padding is one of the supported ones.'''
         assert padding in ('SAME', 'VALID')
@@ -124,14 +141,14 @@ class NetWork(object):
         # Convolution for a given input and kernel
         convolve = lambda i, k: tf.nn.conv2d(i, k, [1, strides[0], strides[1], 1], padding=padding)
         with tf.variable_scope(name, reuse=reuse) as scope:
-            kernel = self.make_var('weights', shape=[kernel[0], kernel[1], input_channel / group, output_channel])
+            filter = self.make_var('weights', shape=[kernel[0], kernel[1], input_channel / group, output_channel])
             if group == 1:
                 # This is the common-case. Convolve the input without any further complications.
-                output = convolve(input, kernel)
+                output = convolve(input, filter)
             else:
                 # Split the input into groups and then convolve each of them independently
                 input_groups = tf.split(input, group, 3)
-                kernel_groups = tf.split(kernel, group, 3)
+                kernel_groups = tf.split(filter, group, 3)
                 output_groups = [convolve(i, k) for i, k in zip(input_groups, kernel_groups)]
                 # Concatenate the groups
                 output = tf.concat(output_groups, 3)
@@ -160,14 +177,14 @@ class NetWork(object):
         # Convolution for a given input and kernel
         convolve = lambda i, k: tf.nn.atrous_conv2d(i, k, dilation, padding=padding)
         with tf.variable_scope(name, reuse=reuse) as scope:
-            kernel = self.make_var('weights', shape=[kernel[0], kernel[1], input_channel / group, output_channel])
+            filter = self.make_var('weights', shape=[kernel[0], kernel[1], input_channel / group, output_channel])
             if group == 1:
                 # This is the common-case. Convolve the input without any further complications.
-                output = convolve(input, kernel)
+                output = convolve(input, filter)
             else:
                 # Split the input into groups and then convolve each of them independently
                 input_groups = tf.split(input, group, 3)
-                kernel_groups = tf.split(kernel, group, 3)
+                kernel_groups = tf.split(filter, group, 3)
                 output_groups = [convolve(i, k) for i, k in zip(input_groups, kernel_groups)]
                 # Concatenate the groups
                 output = tf.concat(output_groups, 3)
@@ -184,37 +201,27 @@ class NetWork(object):
     def deconv(self, input, kernel, output_shape, strides, output_channel, name, reuse=None,
                relu=False,
                padding='SAME',
-               group=1,
                biased=False):
         # Verify that the padding is acceptable
         self.validate_padding(padding)
         # Get the number of channels in the input
         input_channel = input.get_shape().as_list()[-1]
-        # Verify that the grouping parameter is valid
-        assert input_channel % group == 0
-        # Convolution for a given input and kernel
-        deconvolve = lambda i, k: tf.nn.conv2d_transpose(i, k, output_shape, [1, strides[0], strides[1], 1],
-                                                         padding=padding)
+
+        deconvolve = lambda i, k, os: tf.nn.conv2d_transpose(i, k, os, [1, strides[0], strides[1], 1],
+                                                             padding=padding)
         with tf.variable_scope(name, reuse=reuse) as scope:
-            kernel = self.make_var('weights', shape=[kernel[0], kernel[1], output_channel, input_channel / group])
-            if group == 1:
-                # This is the common-case. Convolve the input without any further complications.
-                output = deconvolve(input, kernel)
-            else:
-                # Split the input into groups and then convolve each of them independently
-                input_groups = tf.split(input, group, 3)
-                kernel_groups = tf.split(kernel, group, 3)
-                output_groups = [deconvolve(i, k) for i, k in zip(input_groups, kernel_groups)]
-                # Concatenate the groups
-                output = tf.concat(output_groups, 3)
-            # Add the biases
+
+            output_shape = [output_shape[0], output_shape[1], output_shape[2], output_channel]
+            f_shape = [kernel[0], kernel[1], output_channel, input_channel]
+            filter = self.get_deconv_filter(f_shape, 'weights')
+            output = deconvolve(input, filter, output_shape)
             if biased:
                 biases = self.make_var('biases', [output_channel])
                 output = tf.nn.bias_add(output, biases)
             if relu:
                 # ReLU non-linearity
                 output = tf.nn.relu(output, name=scope.name)
-            return output
+        return output
 
     @layer
     def relu(self, input, name):

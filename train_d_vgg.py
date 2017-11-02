@@ -23,6 +23,9 @@ def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
     s_il = 1. - score_map
     y_ic = tf.multiply(score_map, tf.div(y_il, s_il))
     gt_batch = tf.where(tf.equal(lab_hot, 0.), y_ic, gt_batch)
+    sums = tf.reduce_sum(gt_batch, axis=3)
+    temp = tf.expand_dims((sums - tf.ones_like(sums, dtype=tf.float32)) / num_classes, axis=3)
+    gt_batch = gt_batch - tf.concat([temp for i in range(num_classes)], axis=3)
 
     return gt_batch
 

@@ -75,7 +75,7 @@ def check():
 
 
 def check2():
-    num_classes = 4
+    num_classes = 21
     tau = 0.9
 
     inputs = tf.placeholder(dtype=tf.float32, shape=[1, 3, 3, num_classes])
@@ -91,8 +91,12 @@ def check2():
     s_il = 1. - score_map
     y_ic = tf.multiply(score_map, tf.div(y_il, s_il))
     gt_batch = tf.where(tf.equal(lab_hot, 0.), y_ic, gt_batch)
-    # gt_batch = tf.nn.softmax(gt_batch)
     sums = tf.reduce_sum(gt_batch, axis=3)
+    temp = tf.expand_dims((sums - tf.ones_like(sums, dtype=tf.float32)) / num_classes, axis=3)
+    gt_batch = gt_batch - tf.concat([temp for i in range(num_classes)], axis=3)
+    sums = tf.reduce_sum(gt_batch, axis=3)
+    # gt_batch = tf.nn.softmax(gt_batch)
+
     with tf.Session() as sess:
         feed_dict = {inputs: np.random.rand(1, 3, 3, num_classes).astype(np.float32),
                      label_batch: np.array([[[[0], [1], [2]], [[3], [1], [2]], [[0], [1], [3]]]])}
@@ -129,21 +133,78 @@ def check2():
 
 def read_ckpt():
     from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
-    path = '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt'
+    path_50 = '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt'
+    path_101 = '/home/gzh/Workspace/Weight/resnet101/deeplab_resnet_init.ckpt'
     # path = '/home/gzh/Workspace/Weight/resnet101/deeplab_resnet_init.ckpt'
     # print_tensors_in_checkpoint_file(path,None,True)
     from tensorflow.python import pywrap_tensorflow
-    reader = pywrap_tensorflow.NewCheckpointReader(path)
+    reader = pywrap_tensorflow.NewCheckpointReader(path_50)
     var_to_shape_map = reader.get_variable_to_shape_map()
+    flag = 0
     for key in sorted(var_to_shape_map):
         print("tensor_name: ", key)
+        print("value:", reader.get_tensor(key))
+        flag += 1
+        if flag > 5: break
+
+
+def res50_convert():
+    ori_path = '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt'
+    new_path = '/home/gzh/Workspace/Weight/resnet50/deeplab_res50_init.ckpt'
+    from tensorflow.python import pywrap_tensorflow
+    reader = pywrap_tensorflow.NewCheckpointReader(ori_path)
+    var_to_shape_map = reader.get_variable_to_shape_map()
+    writer = pywrap_tensorflow
+    a = tf.train.Saver()
+    a.restore()
+    for key in var_to_shape_map:
+        pass
+
+
+def deconv(self, input, kernel, output_shape, strides, output_channel, name, reuse=None,
+           relu=False,
+           padding='SAME',
+           biased=False):
+    # Verify that the padding is acceptable
+    self.validate_padding(padding)
+    # Get the number of channels in the input
+    input_channel = input.get_shape().as_list()[-1]
+
+    deconvolve = lambda i, k, os: tf.nn.conv2d_transpose(i, k, os, [1, strides[0], strides[1], 1],
+                                                         padding=padding)
+    with tf.variable_scope(name, reuse=reuse) as scope:
+
+        output_shape = [output_shape[0], output_shape[1], output_shape[2], output_channel]
+        f_shape = [kernel[0], kernel[1], output_channel, input_channel]
+        filter = self.get_deconv_filter(f_shape, 'weights')
+        output = deconvolve(input, filter, output_shape)
+        if biased:
+            biases = self.make_var('biases', [output_channel])
+            output = tf.nn.bias_add(output, biases)
+        if relu:
+            # ReLU non-linearity
+            output = tf.nn.relu(output, name=scope.name)
+    return output
+
+
+def make_deconv_filter(self, name, filter_shape):
+    from math import ceil
+    width, heigh = filter_shape[0], filter_shape[1]
+    f = ceil(width / 2.0)
+    c = (2 * f - 1 - f % 2) / (2.0 * f)
+    bilinear = np.zeros([filter_shape[0], filter_shape[1]])
+    for x in range(width):
+        for y in range(heigh):
+            value = (1 - abs(x / f - c)) * (1 - abs(y / f - c))
+            bilinear[x, y] = value
+    weights = np.zeros(filter_shape)
+    for i in range(filter_shape[2]):
+        weights[:, :, i, i] = bilinear
+
+    init = tf.constant_initializer(value=weights, dtype=tf.float32)
+    return tf.get_variable(name=name, initializer=init, shape=weights.shape)
 
 
 if __name__ == '__main__':
     # check2()
-    # # read_ckpt()
-    g_name = 'vgg_32'
-    if '16' in g_name:
-        print("hehe16")
-    elif '32' in g_name:
-        print("hehe32")
+    read_ckpt()

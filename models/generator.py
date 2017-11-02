@@ -44,9 +44,9 @@ class Generator_vgg_32(NetWork):
         origin_shape = tf.multiply(tf.shape(self.layers['data']), tf.convert_to_tensor([1, 1, 1, 7]))
 
         (self.feed(name + 'score_fr')
-         .resize(origin_shape[1:3], name=name + 'upscore32'))
-        # .deconv([64, 64], origin_shape, [32, 32], num_classes, reuse=self.reuse, biased=False, relu=False,
-        #         name=name + 'upscore32'))
+         # .resize(origin_shape[1:3], name=name + 'upscore32'))
+         .deconv([64, 64], origin_shape, [32, 32], num_classes, reuse=self.reuse, biased=False, relu=False,
+                 name=name + 'upscore32'))
 
     def topredict(self, raw_output, origin_shape=None):
         raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
@@ -88,17 +88,17 @@ class Generator_vgg_16(NetWork):
         pool_shape = tf.shape(self.layers[name + 'score_pool4'])
 
         (self.feed(name + 'score_fr')
-         .resize(pool_shape[1:3], name=name + 'upscore2'))
-        # .deconv([4, 4], pool_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
-        #         name=name + 'upscore2'))
+         # .resize(pool_shape[1:3], name=name + 'upscore2'))
+         .deconv([4, 4], pool_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
+                 name=name + 'upscore2'))
         (self.feed(name + 'upscore2', name + 'score_pool4')
          .add(name=name + 'fuse_pool4'))
         origin_shape = tf.multiply(tf.shape(self.layers['data']), tf.convert_to_tensor([1, 1, 1, 7]))
 
         (self.feed(name + 'fuse_pool4')
-         .resize(origin_shape[1:3], name=name + 'upscore16'))
-        # .deconv([32, 32], origin_shape, [16, 16], num_classes, reuse=self.reuse, biased=False, relu=False,
-        #         name=name + 'upscore16'))
+         # .resize(origin_shape[1:3], name=name + 'upscore16'))
+         .deconv([32, 32], origin_shape, [16, 16], num_classes, reuse=self.reuse, biased=False, relu=False,
+                 name=name + 'upscore16'))
 
     def topredict(self, raw_output, origin_shape=None):
         raw_output = tf.image.resize_bilinear(raw_output, origin_shape)
@@ -144,22 +144,22 @@ class Generator_vgg_8(NetWork):
         pool4_shape = tf.shape(self.layers[name + 'score_pool4'])
 
         (self.feed(name + 'score_fr')
-         .resize(pool4_shape[1:3], name=name + 'upscore2'))
-        # .deconv([4, 4], pool4_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
-        #         name=name + 'upscore2'))
+         # .resize(pool4_shape[1:3], name=name + 'upscore2'))
+         .deconv([4, 4], pool4_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
+                 name=name + 'upscore2'))
 
         (self.feed(name + 'upscore2', name + 'score_pool4')
          .add(name=name + 'fuse_pool4')
-         .resize(pool3_shape[1:3], name=name + 'upscore_pool4'))
-        # .deconv([4, 4], pool3_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
-        #         name=name + 'upscore_pool4'))
+         # .resize(pool3_shape[1:3], name=name + 'upscore_pool4'))
+         .deconv([4, 4], pool3_shape, [2, 2], num_classes, reuse=self.reuse, biased=False, relu=False,
+                 name=name + 'upscore_pool4'))
 
         origin_shape = tf.multiply(tf.shape(self.layers['data']), tf.convert_to_tensor([1, 1, 1, 7]))
         (self.feed(name + 'upscore_pool4', name + 'score_pool3')
          .add(name=name + 'fuse_pool3')
-         .resize(origin_shape[1:3], name=name + 'upscore8'))
-        # .deconv([16, 16], origin_shape, [8, 8], num_classes, reuse=self.reuse, biased=False, relu=False,
-        #         name=name + 'upscore8'))
+         # .resize(origin_shape[1:3], name=name + 'upscore8'))
+         .deconv([16, 16], origin_shape, [8, 8], num_classes, reuse=self.reuse, biased=False, relu=False,
+                 name=name + 'upscore8'))
 
     def topredict(self, raw_output, origin_shape=None):
         raw_output = tf.image.resize_bilinear(raw_output, origin_shape)

@@ -22,7 +22,7 @@ class Discriminator_add_vgg(NetWork):
 
         (self.feed('seg')
          .resize_nn(feature_shape[1:3], name=name + 'resize_nn')
-         .conv([1, 1], 64, [1, 1], reuse=self.reuse, biased=True, relu=True, name=name + 'seg_conv_1'))
+         .conv([5, 5], 64, [1, 1], reuse=self.reuse, biased=True, relu=True, name=name + 'seg_conv_1'))
 
         (self.feed(name + 'seg_conv_1',
                    name + 'conv5_4')
