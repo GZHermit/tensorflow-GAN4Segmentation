@@ -213,7 +213,7 @@ class NetWork(object):
 
             output_shape = [output_shape[0], output_shape[1], output_shape[2], output_channel]
             f_shape = [kernel[0], kernel[1], output_channel, input_channel]
-            filter = self.get_deconv_filter(f_shape, 'weights')
+            filter = self.make_deconv_filter('weights', f_shape)
             output = deconvolve(input, filter, output_shape)
             if biased:
                 biases = self.make_var('biases', [output_channel])

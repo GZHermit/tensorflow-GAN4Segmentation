@@ -59,13 +59,13 @@ def get_arguments():
     POWER = 0.9
     RANDOM_SEED = random.randint(0, 2 ** 31 - 1)
     IS_VAL = False
-    IS_MULTITASK = True
+    IS_MULTITASK = False
     SAVE_NUM_IMAGES = 1
     SAVE_PRED_EVERY = 500
     WEIGHT_DECAY = 0.0003
-    D_NAME = 'disc_add_vgg'  # options:null, disc_add_vgg, disc_add_res50
-    G_NAME = 'vgg_32'  # options:vgg_32,vgg_16,vgg_8,res_50
-    LAMBD = 0.1
+    D_NAME = 'null'  # options:null, disc_add_vgg, disc_add_res50
+    G_NAME = 'vgg_8'  # options:vgg_32,vgg_16,vgg_8,res_50
+    LAMBD = 0.01
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE,
