@@ -159,6 +159,8 @@ class NetWork(object):
             if relu:
                 # ReLU non-linearity
                 output = tf.nn.relu(output, name=scope.name)
+                alpha = 0.2
+                output = tf.maximum(alpha * output, output, name=scope.name)
             return output
 
     @layer
@@ -195,12 +197,15 @@ class NetWork(object):
             if relu:
                 # ReLU non-linearity
                 output = tf.nn.relu(output, name=scope.name)
+                alpha = 0.2
+                output = tf.maximum(alpha * output, output, name=scope.name)
             return output
 
     @layer
     def deconv(self, input, kernel, output_shape, strides, output_channel, name, reuse=None,
                relu=False,
                padding='SAME',
+
                biased=False):
         # Verify that the padding is acceptable
         self.validate_padding(padding)
@@ -221,11 +226,17 @@ class NetWork(object):
             if relu:
                 # ReLU non-linearity
                 output = tf.nn.relu(output, name=scope.name)
+                alpha = 0.2
+                output = tf.maximum(alpha * output, output, name=scope.name)
         return output
 
     @layer
     def relu(self, input, name):
         return tf.nn.relu(input, name=name)
+
+    @layer
+    def leaky_relu(self, input, name, alpha=0.2, ):
+        return tf.maximum(alpha * input, input, name=name)
 
     @layer
     def sigmoid(self, input, name):

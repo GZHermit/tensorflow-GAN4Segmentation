@@ -97,9 +97,9 @@ class Discriminator_add_vgg(NetWork):
                    name + 'conv5_4')
          .concat(axis=3, name=name + 'concat')
          .conv([3, 3], 128, [1, 1], reuse=self.reuse, biased=True, relu=True, name=name + 'conv_1')
-         .max_pool([2, 2], [2, 2], name=name + 'maxpool1')
+         .avg_pool([2, 2], [2, 2], name=name + 'avgpool1')
          .conv([3, 3], 256, [1, 1], reuse=self.reuse, biased=True, relu=True, name=name + 'conv_2')
-         .max_pool([2, 2], [2, 2], name=name + 'maxpool2')
+         .avg_pool([2, 2], [2, 2], name=name + 'avgpool2')
          .conv([3, 3], 512, [1, 1], reuse=self.reuse, biased=True, relu=True, name=name + 'conv_3')
          .conv([3, 3], 1, [1, 1], reuse=self.reuse, biased=True, relu=False, name=name + 'conv_4'))
 

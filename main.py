@@ -11,8 +11,7 @@ time.sleep(2)
 import val_g
 import val_multitask_include_d
 import val_nomulti_include_d
-import train_g_vgg
-import train_g_resnet
+import train_g
 import train_d_vgg
 import train_multitask_vgg
 
@@ -35,10 +34,7 @@ def start(args):
             if args.d_name != 'null':
                 train_d_vgg.train(args)
             else:
-                if '50' in args.g_name:
-                    train_g_resnet.train(args)
-                else:
-                    train_g_vgg.train(args)
+                train_g.train(args)
 
 
 def get_arguments():
@@ -49,10 +45,11 @@ def get_arguments():
     """
 
     BATCH_SIZE = 1
+    # DATA_DIRECTORY = ['/home/shared4TB/GZhao/Dataset/VOCdevkit/VOC2012/',]
     DATA_DIRECTORY = ['/home/gzh/Workspace/Dataset/VOC2012/', ]
     IGNORE_LABEL = 255
     IMG_SIZE = None  # None means we won't use any scaleing or mirroring or resizeing,the input image is origin image.
-    LEARNING_RATE = 3e-5  # if the model includes d, we should change it to 3e-5
+    LEARNING_RATE = 1e-4  # if the model includes d, we should change it to 3e-5
     MOMENTUM = 0.9
     NUM_CLASSES = 21
     NUM_STEPS = 100000 + 1
@@ -61,10 +58,10 @@ def get_arguments():
     IS_VAL = False
     IS_MULTITASK = False
     SAVE_NUM_IMAGES = 1
-    SAVE_PRED_EVERY = 500
+    SAVE_PRED_EVERY = 5000
     WEIGHT_DECAY = 0.0003
     D_NAME = 'null'  # options:null, disc_add_vgg, disc_add_res50
-    G_NAME = 'vgg_8'  # options:vgg_32,vgg_16,vgg_8,res_50
+    G_NAME = 'vgg_16'  # options:vgg_32,vgg_16,vgg_8,res_50
     LAMBD = 0.01
 
     parser = argparse.ArgumentParser(description="VGG for Semantic Segmentation")
@@ -139,7 +136,7 @@ if __name__ == '__main__':
     #                    'vgg16': '/home/shared4TB/GZhao/Weights/vgg16.npy',
     #                    'g': './weights/no_multi/%s/null/0.000100/' % (args.g_name)}
 
-    BASEWEIGHT_FROM = {'res50': '/home/gzh/Workspace/Weight/resnet50/resnet_v1_50.ckpt',
+    BASEWEIGHT_FROM = {'res50': '/home/gzh/Workspace/Weight/resnet50/resnet-50.ckpt',
                        'vgg16': '/home/gzh/Workspace/Weight/vgg16/vgg16.npy',
                        'g': '/home/gzh/Workspace/Weight/weights/%s/disc_add_vgg/0.000100' % (args.g_name)}
 

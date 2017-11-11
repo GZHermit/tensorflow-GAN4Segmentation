@@ -46,7 +46,7 @@ def load_weight(weight_path, saver, sess, include_d=False):
                 saver.restore(sess, weight_path)
         except:
             print("fail to load model weight!")
-            return
+            exit()
     return
 
 

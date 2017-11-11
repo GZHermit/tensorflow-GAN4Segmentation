@@ -95,10 +95,10 @@ def val(args):
     for step in range(num_val):
         it = time.time()
         dict = {image_name: image_list[step], label_name: label_list[step], png_name: png_list[step]}
-        _, _, = sess.run([m_op, predict_img], dict)
+        _, _, iou_val = sess.run([m_op, predict_img, iou], dict)
         if step % 50 == 0 or step == num_val - 1:
             summ = sess.run(sum_op, dict)
             sum_writer.add_summary(summ, step)
-            print("step:{},time:{}".format(step, time.time() - it))
+            print("step:{},time:{},iou:{}".format(step, time.time() - it, iou_val))
 
     print("end......")

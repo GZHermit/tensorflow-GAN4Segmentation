@@ -4,8 +4,8 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from models.generator import choose_generator
 from models.discriminator import choose_discriminator
+from models.generator import choose_generator
 from utils.data_handle import save_weight, load_weight
 from utils.image_process import prepare_label, inv_preprocess, decode_labels
 from utils.image_reader import ImageReader
@@ -91,7 +91,7 @@ def train(args):
     ## get all kinds of variables list
     g_restore_var = [v for v in tf.global_variables() if 'discriminator' not in v.name]
     vgg_restore_var = [v for v in tf.global_variables() if 'discriminator' in v.name and 'image' in v.name]
-    g_var = [v for v in tf.trainable_variables() if 'discriminator' not in v.name]
+    g_var = [v for v in tf.trainable_variables() if 'discriminator' not in v.name and 'deconv' not in v.name]
     d_var = [v for v in tf.trainable_variables() if 'discriminator' in v.name and 'image' not in v.name]
     # g_trainable_var = [v for v in g_var if 'beta' not in v.name or 'gamma' not in v.name] #batch_norm training open
     g_trainable_var = g_var
@@ -100,11 +100,12 @@ def train(args):
     ## set loss
     mce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
     # g_bce_loss = tf.reduce_mean(tf.log(d_fk_pred + eps))
-    g_bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fk_pred), logits=d_fk_pred)
-    g_loss = mce_loss + args.lambd * g_bce_loss
+    g_bce_loss = args.lambd * tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_fk_pred), logits=d_fk_pred)
+    g_loss = mce_loss + g_bce_loss
     # d_loss = tf.reduce_mean(tf.constant(-1.0) * [tf.log(d_gt_pred + eps) + tf.log(1. - d_fk_pred + eps)])
-    d_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
-             + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred), logits=d_fk_pred)
+    d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(d_gt_pred), logits=d_gt_pred) \
+                            + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred),
+                                                                      logits=d_fk_pred))
 
     fk_score_var = tf.reduce_mean(d_fk_pred)
     gt_score_var = tf.reduce_mean(d_gt_pred)
@@ -123,8 +124,9 @@ def train(args):
     lr = tf.scalar_mul(base_lr,
                        tf.pow((1 - iterstep / args.num_steps), args.power))  # learning rate reduce with the time
 
-    g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
-                                                                                                         g_trainable_var)
+    # g_gradients = tf.train.MomentumOptimizer(learning_rate=lr, momentum=args.momentum).compute_gradients(g_loss,
+    #                                                                                                      g_trainable_var)
+    g_gradients = tf.train.AdamOptimizer(learning_rate=lr).compute_gradients(g_loss, g_trainable_var)
     d_gradients = tf.train.MomentumOptimizer(learning_rate=lr * 10, momentum=args.momentum).compute_gradients(d_loss,
                                                                                                               d_trainable_var)
     grad_fk_oi = tf.gradients(d_fk_pred, fk_batch, name='grad_fk_oi')[0]
@@ -132,9 +134,7 @@ def train(args):
     grad_fk_img_oi = tf.gradients(d_fk_pred, image_batch, name='grad_fk_img_oi')[0]
     grad_gt_img_oi = tf.gradients(d_gt_pred, image_batch, name='grad_gt_img_oi')[0]
 
-    train_g_op = tf.train.MomentumOptimizer(learning_rate=lr,
-                                            momentum=args.momentum).minimize(g_loss,
-                                                                             var_list=g_trainable_var)
+    train_g_op = tf.train.AdamOptimizer(learning_rate=lr).minimize(g_loss, var_list=g_trainable_var)
     train_d_op = tf.train.MomentumOptimizer(learning_rate=lr * 10,
                                             momentum=args.momentum).minimize(d_loss,
                                                                              var_list=d_trainable_var)
@@ -145,12 +145,12 @@ def train(args):
     vs_predict = tf.py_func(decode_labels, [predict_batch, args.save_num_images, args.num_classes], tf.uint8)
     tf.summary.image(name='image collection_train', tensor=tf.concat(axis=2, values=[vs_image, vs_label, vs_predict]),
                      max_outputs=args.save_num_images)
-    tf.summary.scalar('fk_score', tf.reduce_mean(d_fk_pred))
-    tf.summary.scalar('gt_score', tf.reduce_mean(d_gt_pred))
+    tf.summary.scalar('fk_score', fk_score_var)
+    tf.summary.scalar('gt_score', gt_score_var)
     tf.summary.scalar('g_loss_train', g_loss_var)
     tf.summary.scalar('d_loss_train', d_loss_var)
     tf.summary.scalar('mce_loss_train', mce_loss_var)
-    tf.summary.scalar('g_bce_loss_train', -1. * g_bce_loss_var)
+    tf.summary.scalar('g_bce_loss_train', g_bce_loss_var)
     tf.summary.scalar('iou_train', iou_var)
     tf.summary.scalar('accuracy_train', accuracy_var)
     tf.summary.scalar('grad_fk_oi', tf.reduce_mean(tf.abs(grad_fk_oi)))
@@ -165,7 +165,7 @@ def train(args):
         tf.summary.histogram(var.op.name + "/values", var)
 
     summary_op = tf.summary.merge_all()
-    summary_writer = tf.summary.FileWriter(args.log_dir, graph=tf.get_default_graph(), max_queue=3)
+    summary_writer = tf.summary.FileWriter(args.log_dir, graph=tf.get_default_graph(), max_queue=10)
 
     ## set session
     print("GPU index:" + str(os.environ['CUDA_VISIBLE_DEVICES']))
@@ -179,35 +179,34 @@ def train(args):
     sess.run(local_init)
 
     ## set saver
-    saver_all = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=2)
+    saver_all = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=5)
     trained_step = 0
     if os.path.exists(args.restore_from + 'checkpoint'):
         trained_step = load_weight(args.restore_from, saver_all, sess)
     else:
         load_weight(args.baseweight_from['vgg16'], vgg_restore_var, sess, True)
-        saver_g = tf.train.Saver(var_list=g_restore_var, max_to_keep=2)
+        saver_g = tf.train.Saver(var_list=g_restore_var, max_to_keep=5)
         load_weight(args.baseweight_from['g'], saver_g, sess)  # the weight is the completely g model
 
     threads = tf.train.start_queue_runners(sess, coord)
     print("all setting has been done,training start!")
 
     ## start training
-    def auto_setting_train_steps(mode):
-        if mode == 0:
-            return 5, 1
-        elif mode == 1:
-            return 1, 5
-        else:
-            return 1, 1
+    # def auto_setting_train_steps(mode):
+    #     if mode == 0:
+    #         return 5, 1
+    #     elif mode == 1:
+    #         return 1, 5
+    #     else:
+    #         return 1, 1
 
-    d_train_steps = 5
+    d_train_steps = 10
     g_train_steps = 1
-    flags = [0 for i in range(3)]
+    # flags = [0 for i in range(3)]
 
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
         feed_dict = {iterstep: step}
-        x, fk, gt, d_fk, d_gt = sess.run([x_batch, fk_batch, gt_batch, d_fk_pred, d_gt_pred], feed_dict)
         for i in range(d_train_steps):
             _, _ = sess.run([train_d_op, metrics_op], feed_dict)
 
@@ -217,18 +216,18 @@ def train(args):
                 feed_dict)
 
         ########################
-        fk_score_, gt_score_ = sess.run([fk_score_var, gt_score_var], feed_dict)
-        if fk_score_ > 0.48 and fk_score_ < 0.52:
-            flags[0] += 1
-            flags[1] = flags[2] = 0
-        elif gt_score_ - fk_score_ > 0.3:
-            flags[1] += 1
-            flags[0] = flags[2] = 0
-        else:
-            flags[2] += 1
-            flags[0] = flags[1] = 0
-        if max(flags) > 100:
-            d_train_steps, g_train_steps = auto_setting_train_steps(flags.index(max(flags)))
+        # fk_score_, gt_score_ = sess.run([fk_score_var, gt_score_var], feed_dict)
+        # if fk_score_ > 0.48 and fk_score_ < 0.52:
+        #     flags[0] += 1
+        #     flags[1] = flags[2] = 0
+        # elif gt_score_ - fk_score_ > 0.3:
+        #     flags[1] += 1
+        #     flags[0] = flags[2] = 0
+        # else:
+        #     flags[2] += 1
+        #     flags[0] = flags[1] = 0
+        # if max(flags) > 100:
+        #     d_train_steps, g_train_steps = auto_setting_train_steps(flags.index(max(flags)))
         ########################
 
         if step > 0 and step % args.save_pred_every == 0:
