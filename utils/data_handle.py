@@ -34,7 +34,7 @@ def load_weight(weight_path, saver, sess, include_d=False):
                 sess.run(b_var.assign(b))
         return
     else:
-        try:
+        #try:
             if '.ckpt' not in weight_path:
                 cp_path = tf.train.latest_checkpoint(weight_path)
                 print("load path: %s" % cp_path)
@@ -44,9 +44,9 @@ def load_weight(weight_path, saver, sess, include_d=False):
             else:
                 print("load path: %s" % weight_path)
                 saver.restore(sess, weight_path)
-        except:
-            print("fail to load model weight!")
-            exit()
+        # except:
+        #     print("fail to load model weight!")
+        #     exit()
     return
 
 

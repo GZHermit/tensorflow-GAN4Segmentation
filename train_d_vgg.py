@@ -11,17 +11,17 @@ from utils.image_process import prepare_label, inv_preprocess, decode_labels
 from utils.image_reader import ImageReader
 
 
-def convert_to_scaling(score_map, num_classes, label_batch, tau=0.9):
+def convert_to_scaling(fk_batch, num_classes, label_batch, tau=0.9):
     lab_hot = tf.squeeze(tf.one_hot(label_batch, num_classes, dtype=tf.float32), axis=3)
 
-    score_map = tf.nn.softmax(score_map, dim=-1)
-    score_map_max = tf.reduce_max(score_map, axis=3, keep_dims=True)
-    score_map_max = tf.maximum(score_map_max, tf.fill(tf.shape(score_map_max), tau))
-    score_map_maxs = tf.concat([score_map_max for i in range(num_classes)], axis=3)
-    gt_batch = tf.where(tf.equal(lab_hot, 1.), score_map_maxs, score_map)
-    y_il = 1. - score_map_maxs
-    s_il = 1. - score_map
-    y_ic = tf.multiply(score_map, tf.div(y_il, s_il))
+    # fk_batch = tf.nn.softmax(fk_batch, dim=-1)
+    fk_batch_max = tf.reduce_max(fk_batch, axis=3, keep_dims=True)
+    fk_batch_max = tf.maximum(fk_batch_max, tf.fill(tf.shape(fk_batch_max), tau))
+    fk_batch_maxs = tf.concat([fk_batch_max for i in range(num_classes)], axis=3)
+    gt_batch = tf.where(tf.equal(lab_hot, 1.), fk_batch_maxs, fk_batch)
+    y_il = 1. - fk_batch_maxs
+    s_il = 1. - fk_batch
+    y_ic = tf.multiply(fk_batch, tf.div(y_il, s_il))
     gt_batch = tf.where(tf.equal(lab_hot, 0.), y_ic, gt_batch)
     sums = tf.reduce_sum(gt_batch, axis=3)
     temp = tf.expand_dims((sums - tf.ones_like(sums, dtype=tf.float32)) / num_classes, axis=3)
@@ -53,6 +53,7 @@ def train(args):
     print("lambda:", args.lambd)
     print("learning_rate:", args.learning_rate)
     print("is_val:", args.is_val)
+    print("is_multitask", args.is_multitask)
     print("---------------------------------")
 
     ## load data
@@ -107,8 +108,8 @@ def train(args):
                             + tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(d_fk_pred),
                                                                       logits=d_fk_pred))
 
-    fk_score_var = tf.reduce_mean(d_fk_pred)
-    gt_score_var = tf.reduce_mean(d_gt_pred)
+    fk_score_var = tf.reduce_mean(tf.sigmoid(d_fk_pred))
+    gt_score_var = tf.reduce_mean(tf.sigmoid(d_gt_pred))
     mce_loss_var, mce_loss_op = tf.metrics.mean(mce_loss)
     g_bce_loss_var, g_bce_loss_op = tf.metrics.mean(g_bce_loss)
     g_loss_var, g_loss_op = tf.metrics.mean(g_loss)
@@ -192,17 +193,17 @@ def train(args):
     print("all setting has been done,training start!")
 
     ## start training
-    # def auto_setting_train_steps(mode):
-    #     if mode == 0:
-    #         return 5, 1
-    #     elif mode == 1:
-    #         return 1, 5
-    #     else:
-    #         return 1, 1
+    def auto_setting_train_steps(mode):
+        if mode == 0:
+            return 5, 1
+        elif mode == 1:
+            return 1, 5
+        else:
+            return 1, 1
 
-    d_train_steps = 10
+    d_train_steps = 5
     g_train_steps = 1
-    # flags = [0 for i in range(3)]
+    flags = [0 for i in range(3)]
 
     for step in range(args.num_steps):
         now_step = int(trained_step) + step if trained_step is not None else step
@@ -216,24 +217,24 @@ def train(args):
                 feed_dict)
 
         ########################
-        # fk_score_, gt_score_ = sess.run([fk_score_var, gt_score_var], feed_dict)
-        # if fk_score_ > 0.48 and fk_score_ < 0.52:
-        #     flags[0] += 1
-        #     flags[1] = flags[2] = 0
-        # elif gt_score_ - fk_score_ > 0.3:
-        #     flags[1] += 1
-        #     flags[0] = flags[2] = 0
-        # else:
-        #     flags[2] += 1
-        #     flags[0] = flags[1] = 0
-        # if max(flags) > 100:
-        #     d_train_steps, g_train_steps = auto_setting_train_steps(flags.index(max(flags)))
+        fk_score_, gt_score_ = sess.run([fk_score_var, gt_score_var], feed_dict)
+        if fk_score_ > 0.48 and fk_score_ < 0.52:
+            flags[0] += 1
+            flags[1] = flags[2] = 0
+        elif gt_score_ - fk_score_ > 0.3:
+            flags[1] += 1
+            flags[0] = flags[2] = 0
+        else:
+            flags[2] += 1
+            flags[0] = flags[1] = 0
+        if max(flags) > 100:
+            d_train_steps, g_train_steps = auto_setting_train_steps(flags.index(max(flags)))
         ########################
 
         if step > 0 and step % args.save_pred_every == 0:
             save_weight(args.restore_from, saver_all, sess, now_step)
 
-        if step % 50 == 0 or step == args.num_steps - 1:
+        if step % 1 == 0 or step == args.num_steps - 1:
             print('step={} d_loss={} g_loss={} mce_loss={} g_bce_loss_={}'.format(now_step, d_loss_,
                                                                                   g_loss_,
                                                                                   mce_loss_,

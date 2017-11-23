@@ -61,7 +61,7 @@ def train(args):
         g_restore_var = [v for v in tf.global_variables() if 'generator' in v.name and 'image' in v.name]
         g_trainable_var = [v for v in tf.trainable_variables() if 'generator' in v.name and 'upscore' not in v.name]
     else:  # aim at resnet50
-        g_restore_var = tf.global_variables()
+        g_restore_var = [v for v in tf.global_variables() if 'fc' not in v.name]
         g_trainable_var = [v for v in tf.trainable_variables() if 'beta' not in v.name or 'gamma' not in v.name]
 
     ## set loss
